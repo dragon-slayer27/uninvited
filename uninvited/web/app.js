@@ -261,6 +261,7 @@ function card(e) {
     h("div", { class: "row" },
       h("div", { class: "verdict" }, v.ghost, " ", h("span", {}, `· ${v.action}`)),
       h("span", { class: "kind" }, KIND[e.kind] || e.kind)),
+    e.planted ? h("div", { class: "planted" }, "🧪 Planted for the demo: not on this laptop") : null,
     h("h4", {}, e.name),
     h("div", { class: "who" }, who),
     ex.what_it_does ? h("p", { class: "what" }, ex.what_it_does)
@@ -386,7 +387,8 @@ function renderTombs(r) {
   const tombs = zombies.map((e) => h("div", { class: "tomb" },
     h("div", { class: "rip" }, "R.I.P."),
     h("h4", {}, e.name),
-    h("p", {}, `It still tries to start ${e.file_name || "a program"} ${e.trigger}. That file is gone.`)));
+    h("p", {}, `It still tries to start ${e.file_name || "a program"} ${e.trigger}. That file is gone.`),
+    e.planted ? h("div", { class: "planted" }, "🧪 planted for the demo") : null));
   const note = windowsGhosts.length
     ? h("p", { class: "muted" }, `Even Windows keeps ${windowsGhosts.length} of its own: ${windowsGhosts.map((e) => e.name).join(", ")}. Those are Microsoft's to bury.`)
     : null;

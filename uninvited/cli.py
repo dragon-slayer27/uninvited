@@ -160,7 +160,7 @@ def cmd_export(args) -> int:
 def cmd_serve(args) -> int:
     from . import server
 
-    server.serve(args.port, open_browser=not args.no_browser, model=args.model)
+    server.serve(args.port, open_browser=not args.no_browser, model=args.model, demo=args.demo)
     return 0
 
 
@@ -207,6 +207,7 @@ def main(argv: list[str] | None = None) -> int:
     sv = sub.add_parser("serve", help="open the local web UI")
     sv.add_argument("--port", type=int, default=8666)
     sv.add_argument("--no-browser", action="store_true")
+    sv.add_argument("--demo", action="store_true", help="mix in the evaluation's planted ghosts (clearly marked)")
     sv.set_defaults(func=cmd_serve)
 
     wt = sub.add_parser("watch", help="Night Watch: durable overnight watcher (needs Temporal)")

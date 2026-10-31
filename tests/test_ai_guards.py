@@ -53,11 +53,14 @@ def test_explanations_are_cached_per_program(entry_factory, fake_ollama):
 
 
 def test_facts_hide_the_username(entry_factory, monkeypatch):
-    monkeypatch.setenv("USERPROFILE", r"C:\Users\Vivaan")
-    monkeypatch.setenv("USERNAME", "Vivaan")
-    e = entry_factory(command=r'"C:\Users\Vivaan\AppData\Local\Thing\thing.exe"', display_name="Task-S-1-5-21-1-2-3-1001")
+    monkeypatch.setenv("USERPROFILE", r"C:\Users\Alex Doe")
+    monkeypatch.setenv("USERNAME", "Alex Doe")
+    monkeypatch.setenv("COMPUTERNAME", "LAPTOP-ABC123")
+    e = entry_factory(command=r'"C:\Users\Alex Doe\AppData\Local\Thing\thing.exe"', display_name="Task-S-1-5-21-1-2-3-1001",
+                      kind="task", location="\\", author="LAPTOP-ABC123\\Alex Doe")
     text = ai.facts(rules.analyze(e))
-    assert "Vivaan" not in text and "%USERPROFILE%" in text and "S-1-5-21-<you>" in text
+    assert "Alex" not in text and "LAPTOP-ABC123" not in text
+    assert "%USERPROFILE%" in text and "S-1-5-21-<you>" in text and "<this-pc>\\<you>" in text
 
 
 def test_numbers_guard():
@@ -100,7 +103,7 @@ def test_seance_reports_invented_ids(entry_factory, fake_ollama):
 
 
 def test_anonymized_export_has_no_paths(entry_factory, monkeypatch):
-    monkeypatch.setenv("USERNAME", "Vivaan")
+    monkeypatch.setenv("USERNAME", "Alex Doe")
     e = rules.analyze(entry_factory(name="Thing"))
     e["verdict"], e["explanation"] = "optional", good_answer()
     rep = {"entries": [e], "wakes": {"exits": 1, "night_events": [1]}, "machine": {"model": "X", "manufacturer": "Y", "os": "Z"}}

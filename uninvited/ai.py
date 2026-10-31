@@ -187,19 +187,25 @@ KIND_TEXT = {
 
 
 def anonymize(text: str) -> str:
+    """Scrub the user's profile path, username, PC name and account SID."""
     if not text:
         return text
     profile = os.environ.get("USERPROFILE") or ""
     user = os.environ.get("USERNAME") or ""
+    computer = os.environ.get("COMPUTERNAME") or ""
     out = text
     if profile:
         out = re.sub(re.escape(profile), "%USERPROFILE%", out, flags=re.IGNORECASE)
     if user and len(user) > 2:
         out = re.sub(r"(?i)\\users\\" + re.escape(user) + r"(?=\\|$)", r"\\Users\\<you>", out)
+        out = re.sub(re.escape(user), "<you>", out, flags=re.IGNORECASE)
+    if computer and len(computer) > 2:
+        out = re.sub(re.escape(computer), "<this-pc>", out, flags=re.IGNORECASE)
     return re.sub(r"S-1-5-21-\d+-\d+-\d+-\d+", "S-1-5-21-<you>", out)
 
 
-def facts(entry: dict) -> str:
+def facts(entry: dict, findings: bool = True) -> str:
+    """The prompt's view of one entry. `findings` adds what the rules found (off for the naive baseline)."""
     f = entry.get("file") or {}
     lines = [f"Kind: {KIND_TEXT.get(entry.get('kind'), entry.get('kind'))}",
              f"Entry name: {anonymize(entry.get('display_name') or entry.get('name') or '')}"]
@@ -208,7 +214,7 @@ def facts(entry: dict) -> str:
     if entry.get("kind") == "task":
         lines.append(f"Task folder: {anonymize(entry.get('location') or '')}")
         if entry.get("author"):
-            lines.append(f"Task author: {entry['author']}")
+            lines.append(f"Task author: {anonymize(entry['author'])}")
     lines.append(f"Command: {anonymize(entry.get('command') or '')[:400]}")
     if entry.get("target"):
         lines.append(f"File: {ntpath.basename(entry['target'])}")
@@ -229,6 +235,11 @@ def facts(entry: dict) -> str:
     lines.append(f"Runs: {entry.get('trigger') or 'unknown'}")
     running = entry.get("running")
     lines.append(f"Running right now: yes, using {running['mb']} MB of memory" if running else "Running right now: no")
+    serious = [x for x in entry.get("flags") or [] if x.get("severity") in ("high", "medium")]
+    if findings and serious:
+        lines.append("Automatic checks found: " + " ".join(x["text"] for x in serious))
+    if findings and entry.get("decoded"):
+        lines.append(f"Decoded PowerShell script: {entry['decoded'][:500]}")
     return "FACTS\n" + "\n".join(lines)
 
 
@@ -353,8 +364,8 @@ def explain(entry: dict, client: Ollama | None = None, use_cache: bool = True) -
 
 
 def direct_verdict(entry: dict, client: Ollama) -> tuple[dict, dict]:
-    """The 'let the model decide' baseline, used only for evaluation."""
-    return client.chat_json(VERDICT_SYSTEM, facts(entry), VERDICT_SCHEMA, num_predict=160)
+    """The 'let the model decide' baseline, used only for evaluation. Raw facts, no rule findings."""
+    return client.chat_json(VERDICT_SYSTEM, facts(entry, findings=False), VERDICT_SCHEMA, num_predict=160)
 
 
 def _allowed_numbers(stats: dict) -> set[str]:

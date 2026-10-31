@@ -1,0 +1,22 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install pytest temporalio
+      - name: Unit tests (no model needed)
+        run: python -m pytest -q
+      - name: Smoke test the real collectors on a clean Windows machine
+        env:
+          NO_COLOR: "1"
+        run: python -m uninvited scan --days 3

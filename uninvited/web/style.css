@@ -165,3 +165,5 @@ footer { text-align: center; color: var(--muted); padding: 30px 16px 50px; borde
 .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--muted); border-top-color: var(--marigold); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: -1px; margin-right: 6px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .highlight { outline: 2px solid var(--teal); outline-offset: 2px; }
+.planted { font-size: 12px; color: #1b1206; background: var(--yellow); border-radius: 6px; padding: 2px 8px; align-self: flex-start; font-weight: 700; }
+.tomb .planted { display: inline-block; margin-top: 8px; }

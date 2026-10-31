@@ -48,6 +48,7 @@ def _display(entry: dict) -> dict:
         "verdict_reason": entry.get("verdict_reason"),
         "explanation": entry.get("explanation"),
         "lookup": entry.get("lookup"),
+        "planted": bool(entry.get("planted")),
         "commands": rules.commands(entry),
     }
 

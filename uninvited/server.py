@@ -10,7 +10,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
-from . import ai, collect, config, report as rpt
+from . import ai, collect, config, report as rpt, rules
 
 WEB = config.PACKAGE_DIR / "web"
 STATIC = {"/": ("index.html", "text/html; charset=utf-8"),
@@ -20,27 +20,51 @@ ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
 
 
 class State:
-    def __init__(self, model: str | None):
+    def __init__(self, model: str | None, demo: bool = False):
         self.lock = threading.RLock()
         self.client = ai.Ollama(model)
         self.model_ready = bool(self.client.pick_model())
+        self.demo = demo
         self.report = rpt.load()
+        if self.report is not None and demo:
+            self._add_planted(self.report)
         self.job = {"running": False, "done": 0, "total": 0, "current": "", "error": None}
         self.story = (self.report or {}).get("story")
+        self.seances: dict[str, dict] = {}
+
+    def _add_planted(self, report: dict) -> None:
+        """Demo mode: mix the evaluation's planted ghosts into the real report, clearly marked."""
+        path = config.PROJECT_DIR / "eval" / "planted.json"
+        try:
+            planted = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        for p in planted:
+            e = rules.analyze(dict(p["entry"]))
+            e["planted"] = True
+            e["explanation"] = ai.explain_cache().get(ai.cache_key(e, self.client.model))
+            e["verdict"], e["verdict_reason"] = rules.decide(e, e["explanation"])
+            report["entries"].append(e)
+        report["summary"] = rpt.summarize(report)
 
     def current(self) -> dict:
         with self.lock:
             if self.report is None:
                 self.report = rpt.build(collect.scan(), self.client.model)
                 rpt.save(self.report)
+                if self.demo:
+                    self._add_planted(self.report)
             return self.report
 
     def rescan(self) -> dict:
         fresh = rpt.build(collect.scan(), self.client.model)
         with self.lock:
             fresh["story"] = None
-            self.report, self.story = fresh, None
             rpt.save(fresh)
+            if self.demo:
+                self._add_planted(fresh)
+            self.report, self.story = fresh, None
+            self.seances = {}
         return fresh
 
     def find(self, entry_id: str) -> dict | None:
@@ -167,8 +191,11 @@ def make_handler(state: State):
                     question = (body.get("question") or "").strip()[:300]
                     if not question:
                         return self._json({"error": "ask something"}, 400)
-                    r = state.current()
-                    return self._json(ai.seance(question, r["entries"], r["wakes"], state.client))
+                    key = question.lower()
+                    if key not in state.seances:
+                        r = state.current()
+                        state.seances[key] = ai.seance(question, r["entries"], r["wakes"], state.client)
+                    return self._json(state.seances[key])
             except ai.ModelError as exc:
                 return self._json({"error": str(exc)}, 503)
             except Exception as exc:
@@ -187,11 +214,13 @@ def _latest_night() -> dict | None:
         return None
 
 
-def serve(port: int = 8666, open_browser: bool = True, model: str | None = None) -> None:
-    state = State(model)
+def serve(port: int = 8666, open_browser: bool = True, model: str | None = None, demo: bool = False) -> None:
+    state = State(model, demo)
     if state.report is None:
         print("First run: scanning (read-only), about 20 seconds...")
         state.current()
+    if demo:
+        print("Demo mode: the evaluation's planted ghosts are mixed in and marked 'planted for the demo'.")
     httpd = ThreadingHTTPServer(("127.0.0.1", port), make_handler(state))
     url = f"http://127.0.0.1:{port}/"
     print(f"Uninvited is listening on {url} (this computer only). Ctrl+C to stop.")

