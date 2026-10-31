@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uninvited · what's haunting this laptop?</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%23f4f1ea' d='M32 4C19 4 10 14 10 27v31l7-6 7 6 8-6 8 6 7-6 7 6V27C54 14 45 4 32 4z'/%3E%3Ccircle cx='24' cy='27' r='4' fill='%23121218'/%3E%3Ccircle cx='40' cy='27' r='4' fill='%23121218'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="fog"></div>
+<header class="top">
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 4C19 4 10 14 10 27v31l7-6 7 6 8-6 8 6 7-6 7 6V27C54 14 45 4 32 4z"/><circle cx="24" cy="27" r="4"/><circle cx="40" cy="27" r="4"/></svg>
+    <div>
+      <h1>Uninvited</h1>
+      <p class="tag">What's haunting this laptop? <span>Read-only. Explained by a model running on this laptop.</span></p>
+    </div>
+  </div>
+  <div class="chips">
+    <span id="model-chip" class="chip"></span>
+    <span class="chip ok" title="The UI binds to 127.0.0.1 and loads nothing from the internet">🔒 localhost only</span>
+    <button id="rescan" class="btn quiet">Rescan</button>
+  </div>
+</header>
+
+<main>
+  <section id="hero" class="hero"></section>
+
+  <section class="panel" id="wakers">
+    <div class="panel-head">
+      <h2>🌙 Night wakers</h2>
+      <p class="sub">Who pulled this laptop out of standby, read from the Windows System log.</p>
+    </div>
+    <div class="grid2">
+      <div class="card story" id="story"></div>
+      <div class="card">
+        <h3>When it left standby, by hour of day</h3>
+        <div id="chart" class="chart"></div>
+        <div id="legend" class="legend"></div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card"><h3>The reasons Windows recorded</h3><table id="reasons" class="reasons"></table></div>
+      <div class="card"><h3>What you can do</h3><div id="tips"></div><p id="armed" class="muted small"></p></div>
+    </div>
+  </section>
+
+  <section class="panel" id="guests">
+    <div class="panel-head">
+      <h2>👻 Uninvited guests</h2>
+      <p class="sub">Everything that starts without asking. <b>Gemma explains what it is. Plain rules decide the verdict.</b></p>
+    </div>
+    <div class="toolbar">
+      <div id="filters" class="filters"></div>
+      <input id="search" type="search" placeholder="Search name, vendor, product…" aria-label="Search">
+      <button id="explain-all" class="btn">Explain all with Gemma</button>
+    </div>
+    <div id="progress" class="progress hidden"><div class="bar"><span></span></div><p></p></div>
+    <div id="cards" class="cards"></div>
+  </section>
+
+  <section class="panel" id="graveyard">
+    <div class="panel-head">
+      <h2>🪦 Graveyard</h2>
+      <p class="sub">Startup entries whose program no longer exists. They try, and fail, every single time.</p>
+    </div>
+    <div id="tombs" class="tombs"></div>
+  </section>
+
+  <section class="panel" id="seance">
+    <div class="panel-head">
+      <h2>🕯️ Séance</h2>
+      <p class="sub">Ask the machine a question. Answers must cite the entries they rely on; numbers are checked.</p>
+    </div>
+    <form id="seance-form" class="seance-form">
+      <input id="question" maxlength="300" placeholder="e.g. What could I turn off so it starts faster?" aria-label="Question">
+      <button class="btn">Ask</button>
+    </form>
+    <div class="examples" id="examples"></div>
+    <div id="answer" class="card answer hidden"></div>
+  </section>
+
+  <section class="panel" id="nightwatch">
+    <div class="panel-head">
+      <h2>🕰️ Night Watch</h2>
+      <p class="sub">A durable Temporal workflow that keeps watch overnight and writes a morning report.</p>
+    </div>
+    <div id="watch" class="card"></div>
+  </section>
+</main>
+
+<footer>
+  <p>Uninvited never changes your system. It shows you the command to turn something off <i>and</i> the command to undo it.</p>
+  <p id="foot-model" class="muted"></p>
+</footer>
+
+<div id="toast" class="toast hidden"></div>
+<script src="/app.js"></script>
+</body>
+</html>
