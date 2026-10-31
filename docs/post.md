@@ -2,6 +2,7 @@
 title: "Uninvited: my laptop left standby 233 times in 9 days. 72 times, it wasn't me."
 published: false
 tags: devchallenge, hf26challenge, ai, opensource
+cover_image: https://raw.githubusercontent.com/dragon-slayer27/uninvited/main/docs/img/cover.png
 ---
 
 *This is a submission for the [Hacktoberfest Open-Source AI Challenge Week 4: Ghost in the Machine](https://dev.to/challenges/hacktoberfest-week4-2026-10-26)*
