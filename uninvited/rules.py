@@ -114,8 +114,12 @@ def _flag(fid: str, severity: str, text: str) -> dict:
     return {"id": fid, "severity": severity, "text": text}
 
 
-def analyze(entry: dict) -> dict:
-    """Add facts that code can establish on its own: windows/zombie/flags/decoded payload."""
+def analyze(entry: dict, signatures_ok: bool = True) -> dict:
+    """Add facts that code can establish on its own: windows/zombie/flags/decoded payload.
+
+    signatures_ok=False means Windows could not verify even its own files on this machine, so
+    signature-based judgements are skipped and the Windows folder is trusted instead.
+    """
     f = entry.get("file") or {}
     target = entry.get("target") or ""
     cn = parse_dn(f.get("signer")).get("CN", "").lower()
@@ -134,6 +138,7 @@ def analyze(entry: dict) -> dict:
         (valid and (f.get("isOsBinary") or cn in OS_SIGNERS))
         or (microsoft_signed and pclass == "windows")
         or (in_windows_tasks and (not f.get("exists") or microsoft_signed))
+        or (not signatures_ok and pclass == "windows")
     )
     entry["unresolved"] = not target
     entry["zombie"] = bool(target and not f.get("exists") and not entry["is_windows"])
@@ -151,15 +156,17 @@ def analyze(entry: dict) -> dict:
     name = ntpath.basename(target).lower()
     if f.get("exists"):
         status = f.get("sigStatus")
-        if status not in ("Valid", "NotSigned", None, ""):
+        if signatures_ok and status not in ("Valid", "NotSigned", None, ""):
             flags.append(_flag("bad-signature", "high", f"Its digital signature does not check out (Windows says: {status})."))
         if pclass in ("temp", "recycle"):
             flags.append(_flag("runs-from-temp", "high", "Runs a file from a temporary or deleted-files folder, where installers don't leave things that should start every day."))
         if name in SYSTEM_NAMES and pclass != "windows" and not microsoft_signed:
             flags.append(_flag("masquerade", "high", f"Uses the name of a Windows system file ({name}) but lives outside the Windows folder."))
-        if location.startswith("\\microsoft\\") and entry.get("kind") == "task" and not (microsoft_signed or entry["is_windows"]):
+        # Malware that hides among Windows' tasks still has to keep its payload outside the Windows folder.
+        if (location.startswith("\\microsoft\\") and entry.get("kind") == "task" and pclass != "windows"
+                and not (microsoft_signed or entry["is_windows"])):
             flags.append(_flag("hidden-in-windows-tasks", "high", "Sits among Windows' own scheduled tasks, but the file is not from Microsoft."))
-        if status == "NotSigned":
+        if status == "NotSigned" and signatures_ok:
             if pclass in USER_WRITABLE:
                 flags.append(_flag("unsigned-user-folder", "medium", "Not digitally signed, and it lives in a folder that any program can write to."))
             else:

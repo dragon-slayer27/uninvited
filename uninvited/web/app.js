@@ -101,6 +101,9 @@ function renderHeader(r) {
     ? `Explanations by ${r.ai.model} through Ollama on this laptop. Nothing leaves it unless you press “Ask the web”.`
     : "Install Ollama and a Gemma 4 model to get explanations. The scan itself needs no AI.";
   $("#explain-all").disabled = !r.ai.ready;
+  if (r.signatures_ok === false && !$("#sig-chip")) {
+    $(".chips").prepend(h("span", { id: "sig-chip", class: "chip warn", title: "Windows could not verify its own files' signatures, so Uninvited trusts the Windows folder and skips signature checks" }, "⚠ signatures unavailable"));
+  }
 }
 
 function stat(cls, value, unit, label, sub) {

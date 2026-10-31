@@ -85,6 +85,31 @@ def test_office_task_is_not_windows(entry_factory):
     assert not rules.analyze(e)["is_windows"]
 
 
+def test_unverifiable_system_file_in_windows_tasks_is_not_a_poltergeist(entry_factory):
+    # Found by CI: on a runner that cannot check catalog signatures, every System32 file reads "NotSigned".
+    e = entry_factory(kind="task", location="\\Microsoft\\Windows\\Defrag\\", target=r"C:\Windows\System32\defrag.exe")
+    e["file"] = {"exists": True, "sigStatus": "NotSigned"}
+    assert "hidden-in-windows-tasks" not in {f["id"] for f in rules.analyze(e)["flags"]}
+
+
+def test_payload_outside_windows_folder_in_windows_tasks_is_flagged(entry_factory):
+    e = entry_factory(kind="task", location="\\Microsoft\\Windows\\WindowsUpdate\\", target=r"C:\ProgramData\WinUpdate\wuauclt.exe")
+    e["file"] = {"exists": True, "sigStatus": "NotSigned"}
+    e = rules.analyze(e)
+    assert "hidden-in-windows-tasks" in {f["id"] for f in e["flags"]}
+    assert rules.decide(e)[0] == "investigate"
+
+
+def test_without_signature_checks_the_windows_folder_is_trusted(entry_factory):
+    e = entry_factory(kind="service", target=r"C:\Windows\System32\svchost.exe")
+    e["file"] = {"exists": True, "sigStatus": "NotSigned"}
+    e = rules.analyze(e, signatures_ok=False)
+    assert e["is_windows"] and e["flags"] == []
+    temp = entry_factory(target=r"C:\Users\x\AppData\Local\Temp\a.exe")
+    temp["file"] = {"exists": True, "sigStatus": "NotSigned"}
+    assert rules.decide(rules.analyze(temp, signatures_ok=False))[0] == "investigate"  # still caught by path
+
+
 def test_unsigned_in_user_folder_is_investigated(entry_factory):
     e = entry_factory(target=r"C:\Users\x\AppData\Roaming\helper\helper.exe")
     e["file"] = {"exists": True, "sigStatus": "NotSigned"}

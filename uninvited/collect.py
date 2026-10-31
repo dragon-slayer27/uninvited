@@ -336,23 +336,24 @@ def _attach_running(entries: list[dict], processes: list[dict]) -> None:
             e["running"] = None
 
 
-def _attach_file_info(entries: list[dict], workdir: Path) -> None:
+def _attach_file_info(entries: list[dict], workdir: Path) -> bool:
+    """Attach file facts to every entry. Returns whether Windows can verify its own signatures here."""
     import json
 
-    paths: dict[str, str] = {}
+    canary = ntpath.join(cmdline.windir(), "System32", "svchost.exe")
+    paths: dict[str, str] = {cmdline.norm(canary): canary}
     for e in entries:
         t = e.get("target") or ""
         if t:
             paths.setdefault(cmdline.norm(t), t)
-    infos: dict = {}
-    if paths:
-        listing = workdir / "paths.json"
-        listing.write_text(json.dumps(list(paths.values())), encoding="utf-8")
-        raw = run_script("fileinfo.ps1", workdir, InPath=str(listing)) or {}
-        listing.unlink(missing_ok=True)
-        infos = {cmdline.norm(k): v for k, v in raw.items()}
+    listing = workdir / "paths.json"
+    listing.write_text(json.dumps(list(paths.values())), encoding="utf-8")
+    raw = run_script("fileinfo.ps1", workdir, InPath=str(listing)) or {}
+    listing.unlink(missing_ok=True)
+    infos = {cmdline.norm(k): v for k, v in raw.items()}
     for e in entries:
         e["file"] = infos.get(cmdline.norm(e.get("target") or ""), {"exists": False})
+    return (infos.get(cmdline.norm(canary)) or {}).get("sigStatus") == "Valid"
 
 
 def scan(days: int = 30) -> dict:
@@ -365,11 +366,12 @@ def scan(days: int = 30) -> dict:
     entries += _task_entries(raw.get("tasks") or [])
     entries += _service_entries(raw.get("services") or [])
     _attach_running(entries, raw.get("processes") or [])
-    _attach_file_info(entries, workdir)
+    signatures_ok = _attach_file_info(entries, workdir)
     return {
         "collected_at": raw.get("collectedAt"),
         "machine": raw.get("machine") or {},
         "entries": entries,
+        "signatures_ok": signatures_ok,
         "standby": raw.get("standby") or [],
         "sleep_wakes": raw.get("sleepWakes") or [],
         "log_start": raw.get("logStart"),

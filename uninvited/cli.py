@@ -84,6 +84,9 @@ def print_entries(report: dict, show_all: bool = False) -> None:
 
 def cmd_scan(args) -> int:
     report = _scan(args.days, args.model)
+    if not report.get("signatures_ok", True):
+        print(_c("yel", "Note: Windows could not verify digital signatures on this machine (even its own files), "
+                        "so Uninvited trusts the Windows folder instead and skips signature-based checks."))
     print_wakes(report["wakes"])
     print_entries(report, args.all)
     if args.json:

@@ -8,8 +8,8 @@ jobs:
   test:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Install test dependencies
@@ -19,4 +19,12 @@ jobs:
       - name: Smoke test the real collectors on a clean Windows machine
         env:
           NO_COLOR: "1"
-        run: python -m uninvited scan --days 3
+        run: python -m uninvited scan --days 3 --json ci-report.json
+      - name: A clean Windows runner must not be full of poltergeists
+        shell: python
+        run: |
+          import json
+          r = json.load(open("ci-report.json", encoding="utf-8"))
+          print("signatures_ok:", r.get("signatures_ok"), "| summary:", r["summary"])
+          bad = [e["name"] for e in r["entries"] if e["verdict"] == "investigate"]
+          assert not bad, f"false alarms on a clean runner: {bad[:10]}"

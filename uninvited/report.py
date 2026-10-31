@@ -58,8 +58,9 @@ def build(scan: dict, model: str | None = None) -> dict:
     client = ai.Ollama(model)
     client_model = client.pick_model() or client.model
     entries = scan.get("entries") or []
+    signatures_ok = scan.get("signatures_ok", True)
     for e in entries:
-        rules.analyze(e)
+        rules.analyze(e, signatures_ok)
         cached = ai.explain_cache().get(ai.cache_key(e, client_model))
         e["explanation"] = cached
         e["verdict"], e["verdict_reason"] = rules.decide(e, cached)
@@ -67,6 +68,7 @@ def build(scan: dict, model: str | None = None) -> dict:
         "collected_at": scan.get("collected_at"),
         "machine": scan.get("machine") or {},
         "model": client_model,
+        "signatures_ok": signatures_ok,
         "wakes": wakes.analyze(scan),
         "entries": entries,
         "errors": scan.get("errors") or [],
