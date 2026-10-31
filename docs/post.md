@@ -151,10 +151,11 @@ Sometimes Gemma just doesn't know, or worse, doesn't know that it doesn't know. 
 
 - Python standard library only for the scanner, rules, model client and dashboard. No build step, no CDN, nothing loaded from the internet.
 - The dashboard binds to `127.0.0.1`, checks the `Host` header, sends a strict Content-Security-Policy, and renders every entry name with `textContent`. A startup entry is untrusted input, so a malicious one named `<img onerror=...>` cannot attack the tool that is inspecting it.
-- 40 unit tests run on GitHub Actions on `windows-latest`, plus a smoke scan of the runner's own (very clean) Windows.
+- 44 unit tests run on GitHub Actions on `windows-latest`, followed by a real scan of the runner's own clean Windows. The build fails if that clean machine shows a single "investigate".
 
 ### What went wrong (and what I learned)
 
+- **My CI found 193 poltergeists on a perfectly clean Windows machine.** The smoke test scans GitHub's Windows runner, and there `Get-AuthenticodeSignature` could not verify Windows' own catalog-signed files, so every System32 binary read "NotSigned". My rule "a task among Windows' tasks whose file isn't from Microsoft" fired 193 times. My laptop never showed this. Now a canary checks `svchost.exe`'s signature first. If Windows can't verify even its own files, Uninvited says so, trusts the Windows folder, and only flags payloads in places Microsoft never installs to. CI now *fails* if a clean runner shows a single "investigate".
 - **Every file was "missing" in my first scan.** Windows PowerShell 5.1's `ConvertFrom-Json` emits an array as one object, so my `@(...)` wrapped the whole list into a single "path". 320 zombies, all fake.
 - **My tool called Windows Defender a poltergeist.** Defender's engine `MsMpEng.exe` lives in `ProgramData`, which matched my "system file outside the Windows folder" rule. Validly Microsoft-signed files are now exempt.
 - **Every driver helper claimed to be Microsoft.** Drivers are signed by Microsoft's hardware programme, so ASUS, Intel, Realtek and Dolby services all showed "Microsoft Corporation". The real vendor is in the file's version info.
@@ -188,6 +189,6 @@ Día de los Muertos honours what is gone, and Halloween is about what refuses to
 - **Best Use of Gemma:** Gemma 4 E4B (QAT) is the explanation engine for every startup item, the night report and the séance. E2B is evaluated as the low-memory option.
 - **Temporal:** Night Watch is a Temporal workflow with durable timers and retried model activities, plus a durable "explain everything" batch. Tested by taking the model away mid-run.
 - **SerpApi:** opt-in, citation-checked web lookup for items the local model doesn't recognise.
-- **GitHub Copilot:** built with Copilot in VS Code; tests and a Windows smoke scan run on GitHub Actions.
+- **GitHub Copilot:** built with Copilot in VS Code. GitHub Actions runs the tests plus a real scan of a clean Windows runner, and that scan caught a false-alarm bug my laptop couldn't show me.
 
 *AI disclosure: this project and post were made with substantial help from GitHub Copilot. All numbers come from my own laptop's logs and from the evaluation in the repo.*

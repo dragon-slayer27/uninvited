@@ -127,6 +127,7 @@ Your startup list says a lot about you: your VPN, your exam software, your games
 ## Limitations
 
 - Windows only (10/11). Some laptops keep only a week or two of the System log, so the window is "as far back as Windows remembers".
+- Signature checks depend on Windows being able to verify its own files. If it can't (CI found this on a GitHub runner), Uninvited detects it with a canary, says so, trusts the Windows folder, and only flags payloads in places Microsoft never installs to.
 - Per-app blame for battery drain in standby needs `powercfg /sleepstudy`, which requires admin rights. Uninvited points you to it rather than guessing.
 - Gemma can be confidently wrong. On my laptop it called Chrome's undocumented "Platform Experience Helper" an updater. The verdict was still harmless ("keep"), and the web lookup exists for exactly these cases.
 - Category-to-verdict is coarse. Office's Click-to-Run service is a "productivity" helper, but Office won't open without it.
@@ -137,7 +138,7 @@ Your startup list says a lot about you: your VPN, your exam software, your games
 - **Temporal** (MIT) for Night Watch, using the local dev server.
 - **SerpApi** for the opt-in lookup.
 - Python standard library only for the scanner, the rules and the dashboard (no build step, no CDN).
-- Built during Hacktoberfest 2026 ("Ghost in the Machine") with **GitHub Copilot** as a pair programmer. Tests run on GitHub Actions on `windows-latest`.
+- Built during Hacktoberfest 2026 ("Ghost in the Machine") with **GitHub Copilot** as a pair programmer. 44 tests and a real scan of a clean Windows machine run on GitHub Actions (`windows-latest`); the build fails on any false alarm.
 
 ## License
 
