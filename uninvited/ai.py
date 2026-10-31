@@ -83,9 +83,10 @@ NARRATE_SCHEMA = {
 }
 
 NARRATE_SYSTEM = """You write the morning report of a laptop's night, like a ghost hunter's log, for a student.
-You get STATS measured from the Windows event log. Write a headline (max 14 words) and a story (3 to 4 sentences).
-Rules: use ONLY numbers that appear in STATS, exactly as written. Do not do arithmetic. Do not give advice.
-Be vivid but accurate: the laptop leaving standby is not a person; 'undocumented code' means nobody knows."""
+You get FACTS measured from the Windows event log. Write a headline (max 14 words) and a story (3 to 4 sentences).
+Rules: use ONLY numbers that appear in FACTS, exactly as written. Do not do arithmetic. Do not give advice.
+Never use field names, underscores or quotes around labels. Be vivid but accurate: the laptop leaving standby is not a person,
+and an undocumented code means nobody knows what it is."""
 
 GROUNDED_SCHEMA = {
     "type": "object",
@@ -110,9 +111,10 @@ SEANCE_SCHEMA = {
     "required": ["answer", "cited_ids"],
 }
 
-SEANCE_SYSTEM = """You are the medium at a seance with a laptop. Answer the question using ONLY the RECORDS and STATS given.
-Cite every record you rely on by its id (like E1a2b3c4d) in cited_ids. If the records do not answer it, say so.
-Keep it under 90 words, plain English, a little spooky. Never claim something is malware unless a record says 'investigate'."""
+SEANCE_SYSTEM = """You are the medium at a seance with a laptop. Answer the question using ONLY the WAKES facts and the RECORDS given.
+Cite your sources in cited_ids: the id of every record you rely on (like E1a2b3c4d), and "WAKES" if you use the wake facts.
+If they do not answer the question, say so. Keep it under 90 words, plain English, a little spooky.
+Never mention field names or the words RECORDS or WAKES in the answer. Never claim something is malware unless a record says 'investigate'."""
 
 
 class ModelError(RuntimeError):
@@ -388,6 +390,8 @@ def _allowed_numbers(stats: dict) -> set[str]:
         elif isinstance(v, str):
             for n in re.findall(r"\d+(?:\.\d+)?", v):
                 allowed.add(n)
+                if n.endswith(".0"):
+                    allowed.add(n[:-2])
 
     walk(stats)
     return allowed
@@ -423,19 +427,21 @@ def fallback_story(w: dict) -> dict:
 
 def narrate_wakes(w: dict, client: Ollama | None = None, attempts: int = 2) -> dict:
     client = client or Ollama()
-    stats = wake_stats_for_story(w)
-    user = "STATS\n" + json.dumps(stats, indent=1)
+    facts_text = wake_facts(w)
+    user = "FACTS\n" + facts_text
     rejected: list[str] = []
     for _ in range(attempts):
         try:
             data, info = client.chat_json(NARRATE_SYSTEM, user, NARRATE_SCHEMA, num_predict=260, temperature=0.4)
         except ModelError:
             break
-        ok, bad = numbers_ok(data.get("headline", "") + " " + data.get("story", ""), stats)
-        if ok:
+        text = data.get("headline", "") + " " + data.get("story", "")
+        ok, bad = numbers_ok(text, {"facts": facts_text})
+        if ok and "_" not in text:
             return {**data, "source": client.model, "stats": info, "rejected_numbers": rejected}
         rejected += bad
-        user += f"\n\nYour last answer used numbers that are not in STATS: {', '.join(bad)}. Use only STATS numbers."
+        user += (f"\n\nYour last answer used numbers that are not in FACTS: {', '.join(bad)}. Use only FACTS numbers."
+                 if bad else "\n\nYour last answer used field names. Write plain English.")
     out = fallback_story(w)
     out["rejected_numbers"] = rejected
     return out
@@ -457,6 +463,32 @@ def grounded_explain(entry: dict, results: list[dict], client: Ollama | None = N
     return data
 
 
+def wake_facts(w: dict) -> str:
+    """The wake summary as plain sentences, so the model never sees (or repeats) field names."""
+    if not w or not w.get("exits"):
+        return "No standby exits were recorded."
+    lines = [
+        f"In the last {w.get('window_days')} days the laptop left standby {w.get('exits')} times; "
+        f"{w.get('not_you')} of those were not caused by the user.",
+        f"Between midnight and 6 AM it left standby {w.get('night_exits')} times; {w.get('night_not_you')} of those were not the user.",
+        f"It spent {w.get('standby_hours')} hours in standby and was really awake for {w.get('awake_hours')} of them.",
+        f"Windows had to clamp down on battery drain in standby {w.get('austerity_count')} times, "
+        f"on {len(w.get('austerity_nights') or [])} different nights.",
+    ]
+    reasons = sorted((w.get("reasons") or {}).items(), key=lambda kv: -kv[1])
+    lines.append("Reasons Windows recorded: " + "; ".join(f"{r}: {n} times" for r, n in reasons) + ".")
+    for r, note in (w.get("reason_notes") or {}).items():
+        if note:
+            lines.append(f"'{r}' means: {note}")
+    if w.get("unknown_codes"):
+        lines.append("Numeric reason codes such as " + ", ".join(w["unknown_codes"]) + " are undocumented: nobody knows what they mean.")
+    lines.append(f"Devices allowed to wake it: {', '.join(w.get('wake_armed') or []) or 'none'}.")
+    return "\n".join(lines)
+
+
+_ENTRY_ID = re.compile(r"^E[0-9a-f]{8}$")
+
+
 def seance(question: str, entries: list[dict], wake_summary: dict, client: Ollama | None = None) -> dict:
     client = client or Ollama()
     words = {w for w in re.findall(r"[a-z0-9]{3,}", question.lower())}
@@ -471,18 +503,18 @@ def seance(question: str, entries: list[dict], wake_summary: dict, client: Ollam
     records = []
     for e in ranked:
         ex = e.get("explanation") or {}
-        records.append(f"{e['id']}: {e.get('display_name')} | {ex.get('product') or e.get('publisher')} | "
+        records.append(f"{e['id']}: {anonymize(e.get('display_name') or '')} | {ex.get('product') or e.get('publisher')} | "
                        f"verdict={e.get('verdict')} | runs {e.get('trigger')} | "
                        f"{'running, ' + str(e['running']['mb']) + ' MB' if e.get('running') else 'not running'} | "
                        f"{ex.get('what_it_does') or ''}")
-    stats = wake_stats_for_story(wake_summary)
-    user = (f"QUESTION: {question}\n\nRECORDS\n" + "\n".join(records) + "\n\nSTATS\n" + json.dumps(stats))
+    facts_text = wake_facts(wake_summary)
+    user = (f"QUESTION: {question}\n\nWAKES\n{facts_text}\n\nRECORDS\n" + "\n".join(records))
     data, info = client.chat_json(SEANCE_SYSTEM, user, SEANCE_SCHEMA, num_predict=260, temperature=0.2)
-    known = {e["id"] for e in entries}
+    known = {e["id"] for e in entries} | {"WAKES"}
     raw_ids = [c for c in data.get("cited_ids") or [] if isinstance(c, str)]
-    data["cited_ids"] = [c for c in raw_ids if c in known]
-    data["invented_ids"] = [c for c in raw_ids if c not in known]
-    ok, bad = numbers_ok(data.get("answer", ""), {"stats": stats, "records": records})
+    data["cited_ids"] = list(dict.fromkeys(c for c in raw_ids if c in known))
+    data["invented_ids"] = [c for c in raw_ids if c not in known and _ENTRY_ID.match(c)]
+    ok, bad = numbers_ok(data.get("answer", ""), {"wakes": facts_text, "records": records, "stats": wake_summary})
     data["unverified_numbers"] = bad
     data["stats"] = info
     return data

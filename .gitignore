@@ -8,3 +8,4 @@ dist/
 .env
 uninvited-summary*.json
 eval/runs/
+docs/video/

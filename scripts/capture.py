@@ -64,9 +64,10 @@ def shots(browser) -> None:
 
     page.click("text=Uninvited guest")
     page.wait_for_timeout(300)
-    box = page.locator("#cards").bounding_box()
-    page.screenshot(path=str(IMG / "guests.png"), full_page=True,
-                    clip={"x": box["x"] - 10, "y": box["y"] - 70, "width": box["width"] + 20, "height": 900})
+    page.locator("#guests").scroll_into_view_if_needed()
+    page.evaluate("document.querySelector('#guests').scrollIntoView({block: 'start'})")
+    page.wait_for_timeout(300)
+    page.screenshot(path=str(IMG / "guests.png"))
 
     ready(page, DEMO)
     page.click("text=Poltergeist")
@@ -136,7 +137,9 @@ def video(browser) -> None:
     caption(page, "Séance: ask your laptop. Answers cite the entries they use; numbers are checked.", 5)
     page.goto(TEMPORAL)
     page.wait_for_timeout(2500)
-    caption(page, "Night Watch runs on Temporal. With the model down, it retried 8 times, then recovered.", 5)
+    page.get_by_text("explain_entry").first.scroll_into_view_if_needed()
+    page.wait_for_timeout(800)
+    caption(page, "Night Watch runs on Temporal. With the model down, it retried 8 times, then recovered on attempt 9.", 5.5)
     caption(page, "Gemma 4 E4B on an Intel Arc iGPU, via Ollama. Nothing left this laptop.", 4)
     path = page.video.path()
     ctx.close()

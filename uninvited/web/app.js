@@ -199,7 +199,8 @@ function classOf(reason) {
 }
 
 function renderReasons(w) {
-  const rows = Object.entries(w.reasons || {}).map(([reason, n]) => {
+  // Sort explicitly: JS puts integer-like keys such as "16777220" first in object order.
+  const rows = Object.entries(w.reasons || {}).sort((a, b) => b[1] - a[1]).map(([reason, n]) => {
     const note = w.reason_notes[reason] || (/^\d+$/.test(reason) ? "A reason code Windows logs but nobody has documented." : "");
     return h("tr", {},
       h("td", { class: "n" }, n),
@@ -409,13 +410,14 @@ async function ask(ev) {
   try {
     const a = await api("/api/seance", { question: q });
     const cites = (a.cited_ids || []).map((id) => {
+      if (id === "WAKES") return h("button", { class: "cite", onclick: () => $("#wakers").scrollIntoView({ behavior: "smooth" }) }, "Wake log");
       const e = state.report.entries.find((x) => x.id === id);
       return h("button", { class: "cite", onclick: () => jump(id) }, e ? e.name : id);
     });
     const warn = (a.unverified_numbers || []).length || (a.invented_ids || []).length
       ? h("div", { class: "flag medium" }, `Unverified in this answer: ${[...(a.unverified_numbers || []), ...(a.invented_ids || [])].join(", ")}`)
       : null;
-    box.replaceChildren(h("p", {}, a.answer), warn, h("div", {}, ...cites));
+    box.replaceChildren(...[h("p", {}, a.answer), warn, h("div", {}, ...cites)].filter(Boolean));
   } catch (e) {
     box.replaceChildren(h("p", { class: "muted" }, e.message));
   }
@@ -445,12 +447,13 @@ function renderWatch(r) {
       h("p", { class: "muted small" }, "It runs as a Temporal workflow: every few minutes it reads new standby events and new startup items, asks Gemma about anything new, and survives sleep, reboots and Ollama crashes."));
     return;
   }
-  el.replaceChildren(
+  el.replaceChildren(...[
     h("p", {}, h("b", {}, n.headline || "Night Watch report")),
     h("p", { class: "muted" }, `Watching since ${n.started || "?"} · last check ${n.last_check || "?"} · ${n.checks || 0} checks · workflow ${n.workflow_id || ""}`),
     n.story ? h("p", {}, n.story) : null,
-    ...(n.new_entries || []).map((x) => h("div", { class: "flag medium" }, `New since the watch began: ${x.name} — ${x.product || x.publisher || ""}`)),
-    h("p", { class: "muted small" }, `Standby exits seen during the watch: ${n.exits || 0} (${n.not_you || 0} not you).`));
+    ...(n.new_entries || []).map((x) => h("div", { class: "flag medium" }, `New since the watch began: ${x.name} (${x.product || x.publisher || "unknown"}, ${VERDICTS[x.verdict] ? VERDICTS[x.verdict].ghost.toLowerCase() : x.verdict})`)),
+    h("p", { class: "muted small" }, `Standby exits seen during the watch: ${n.exits || 0} (${n.not_you || 0} not you).`),
+  ].filter(Boolean));
 }
 
 // ------------------------------------------------------------------ wiring

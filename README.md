@@ -45,6 +45,8 @@ rules.decide ──► keep / your call / lay it to rest / investigate / look it
 
 The model can only influence a verdict through a **category** (e.g. "updater" → keep, "chat app" → your call). Hard facts always win: a missing file is a zombie whatever the model thinks, and an encoded PowerShell download cradle is a poltergeist even if the model calls it an updater. When the model isn't confident, the verdict is "look it up", not a guess.
 
+<img src="docs/img/card-poltergeist.png" alt="A planted poltergeist: the rules decode the PowerShell and decide; Gemma explains" width="380"> <img src="docs/img/card-mysql.png" alt="A real guest: MySQL, with the command to turn it off and the undo" width="380">
+
 ### Does it work? (full details in [eval/EVAL.md](eval/EVAL.md))
 
 I labelled all 65 non-Windows startup entries on my laptop and planted 14 more: 10 malicious-style entries modelled on MITRE ATT&CK persistence techniques, and 4 harmless look-alikes.

@@ -97,9 +97,18 @@ def test_grounded_citations_are_validated(entry_factory, fake_ollama):
 def test_seance_reports_invented_ids(entry_factory, fake_ollama):
     e = rules.analyze(entry_factory(id="E12345678"))
     e["verdict"] = "optional"
-    client = fake_ollama([{"answer": "Thing starts at sign-in.", "cited_ids": ["E12345678", "E99999999"]}])
+    client = fake_ollama([{"answer": "Thing starts at sign-in.", "cited_ids": ["E12345678", "E99999999", "STATS", "WAKES"]}])
     out = ai.seance("what starts?", [e], {"by_class": {}}, client)
-    assert out["cited_ids"] == ["E12345678"] and out["invented_ids"] == ["E99999999"]
+    assert out["cited_ids"] == ["E12345678", "WAKES"] and out["invented_ids"] == ["E99999999"]
+
+
+def test_wake_facts_are_plain_sentences():
+    w = {"window_days": 9.0, "exits": 233, "not_you": 72, "night_exits": 55, "night_not_you": 20, "standby_hours": 156.5,
+         "awake_hours": 16.9, "austerity_count": 46, "austerity_nights": ["a", "b"], "reasons": {"Lid": 46, "16777220": 14},
+         "reason_notes": {"Lid": "The lid was opened.", "16777220": ""}, "unknown_codes": {"16777220": 14}, "wake_armed": []}
+    text = ai.wake_facts(w)
+    assert "night_exits" not in text and "_" not in text.replace("16777220", "")
+    assert "left standby 233 times; 72" in text and "Lid: 46 times" in text and "undocumented" in text
 
 
 def test_anonymized_export_has_no_paths(entry_factory, monkeypatch):
