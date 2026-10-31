@@ -14,8 +14,8 @@ So I wrote a ghost hunter for Windows laptops. It runs a Gemma 4 model on the la
 - In the 9 days Windows still remembered, the laptop **left standby 233 times**. **72 of those weren't me**: no lid, no key, no touchpad.
 - It spent **156.5 hours "asleep" and was actually awake for 16.9 of them**. Deep sleep only 89% of the time.
 - **46 times, on every single one of those 9 nights**, Windows itself had to step in because standby was eating more battery than it is allowed to. The worst one was at **4:00 AM on Halloween morning**, when it spent 41% of an hour of "sleep" awake.
-- **14 exits carry the reason code `16777220`**, which nobody has documented. Not Microsoft, not the forums, not my tool. It is a literal unknown ghost.
-- And **58 programs start on their own** before I ask for anything.
+- **14 exits carry the reason code `16777220`**, which I could not find documented anywhere: not by Microsoft, not on the forums. My tool can't name it either. It is a literal unknown ghost.
+- And **58 things start on their own** before I ask for anything.
 
 ## What I Built
 
@@ -49,7 +49,7 @@ The video is a silent, captioned walk through the real dashboard on my laptop. T
 
 ![MySQL card](https://raw.githubusercontent.com/dragon-slayer27/uninvited/main/docs/img/card-mysql.png)
 
-**A poltergeist** (planted): a hidden PowerShell downloader posing as "OneDriveUpdate". The rules flag it and decode the base64; Gemma explains what the decoded script does.
+**A poltergeist** (planted): a hidden PowerShell downloader posing as "OneDriveUpdate". The rules flag it and decode the base64: it downloads a script and runs it. Gemma had that decoded script in its prompt and *still* described it as "a script to check for or apply updates" for OneDrive. That is exactly why it doesn't get a vote.
 
 ![Poltergeist card](https://raw.githubusercontent.com/dragon-slayer27/uninvited/main/docs/img/card-poltergeist.png)
 
@@ -138,7 +138,7 @@ The best time to catch a night waker is at night, and a laptop at night is the w
 - the workflow sleeps on **durable timers**, so a closed lid or a reboot just delays the next check;
 - each check writes a morning report that the dashboard shows.
 
-I tested the part that matters. I started a worker that could not reach the model, then planted a fake startup entry. Night Watch spotted it on its next check and tried to explain it. Temporal retried **8 times over about 23 minutes**, backing off each time. Then I started a worker that could reach Ollama. **Attempt 9 succeeded**, the rules called it a zombie, and the morning report said "1 new uninvited guest". Nothing was lost and nothing ran twice.
+I tested the part that matters. I started a worker that could not reach the model, then planted a fake startup entry. Night Watch spotted it on its next check and tried to explain it. Temporal retried **8 times over about 23 minutes**, backing off each time. Then I started a worker that could reach Ollama. **Attempt 9 succeeded**, the rules called it a zombie, and the morning report said "1 new uninvited guest". Nothing was lost.
 
 ![Temporal retrying](https://raw.githubusercontent.com/dragon-slayer27/uninvited/main/docs/img/temporal-retrying.png)
 
@@ -185,7 +185,7 @@ I built this in one night with GitHub Copilot as my pair programmer in VS Code. 
 
 ## The Spirit of It
 
-Día de los Muertos honours what is gone, and Halloween is about what refuses to stay gone. A startup entry for a program you uninstalled years ago is a little of both: it still tries to come back every time you sign in. Uninvited has a graveyard for those. My own laptop has none, though even Windows keeps two of its own: tasks that point at files Microsoft deleted. The ghosts I did find were quieter. A laptop that is never really asleep, a database that starts every boot, and a reason code that nobody can name. Now I know who's knocking at 4 AM, and at least some of the time, it's me.
+Día de los Muertos honours what is gone, and Halloween is about what refuses to stay gone. A startup entry for a program you uninstalled years ago is a little of both: it still tries to come back every time you sign in. Uninvited has a graveyard for those. My own laptop has none, though even Windows keeps two of its own: tasks that point at files that are no longer there. The ghosts I did find were quieter. A laptop that is never really asleep, a database that starts every boot, and a reason code nobody seems able to name. Now I know who's knocking at 4 AM, and at least some of the time, it's me.
 
 ## Prize Categories
 
