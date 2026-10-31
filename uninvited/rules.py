@@ -163,8 +163,10 @@ def analyze(entry: dict, signatures_ok: bool = True) -> dict:
         if name in SYSTEM_NAMES and pclass != "windows" and not microsoft_signed:
             flags.append(_flag("masquerade", "high", f"Uses the name of a Windows system file ({name}) but lives outside the Windows folder."))
         # Malware that hides among Windows' tasks still has to keep its payload outside the Windows folder.
+        # Without working signature checks we can't prove a file is Microsoft's, so only flag places Microsoft never installs to.
+        suspicious_place = signatures_ok or pclass in {"temp", "recycle", "public", "downloads", "appdata", "other"}
         if (location.startswith("\\microsoft\\") and entry.get("kind") == "task" and pclass != "windows"
-                and not (microsoft_signed or entry["is_windows"])):
+                and not (microsoft_signed or entry["is_windows"]) and suspicious_place):
             flags.append(_flag("hidden-in-windows-tasks", "high", "Sits among Windows' own scheduled tasks, but the file is not from Microsoft."))
         if status == "NotSigned" and signatures_ok:
             if pclass in USER_WRITABLE:

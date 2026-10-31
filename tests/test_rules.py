@@ -108,6 +108,14 @@ def test_without_signature_checks_the_windows_folder_is_trusted(entry_factory):
     temp = entry_factory(target=r"C:\Users\x\AppData\Local\Temp\a.exe")
     temp["file"] = {"exists": True, "sigStatus": "NotSigned"}
     assert rules.decide(rules.analyze(temp, signatures_ok=False))[0] == "investigate"  # still caught by path
+    # Found by CI: Defender's own tasks run from ProgramData and could not be verified on the runner.
+    defender = entry_factory(kind="task", location="\\Microsoft\\Windows\\Windows Defender\\",
+                             target=r"C:\ProgramData\Microsoft\Windows Defender\Platform\4.18\MpCmdRun.exe")
+    defender["file"] = {"exists": True, "sigStatus": "NotSigned"}
+    assert rules.analyze(defender, signatures_ok=False)["flags"] == []
+    hidden = entry_factory(kind="task", location="\\Microsoft\\Windows\\Maintenance\\", target=r"C:\Users\x\AppData\Roaming\m.exe")
+    hidden["file"] = {"exists": True, "sigStatus": "NotSigned"}
+    assert "hidden-in-windows-tasks" in {f["id"] for f in rules.analyze(hidden, signatures_ok=False)["flags"]}
 
 
 def test_unsigned_in_user_folder_is_investigated(entry_factory):
