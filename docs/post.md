@@ -151,18 +151,20 @@ Sometimes Gemma just doesn't know, or worse, doesn't know that it doesn't know. 
 ### 6. The boring parts that make it trustworthy
 
 - Python standard library only for the scanner, rules, model client and dashboard. No build step, no CDN, nothing loaded from the internet.
-- The dashboard binds to `127.0.0.1`, checks the `Host` header, sends a strict Content-Security-Policy, and renders every entry name with `textContent`. A startup entry is untrusted input, so a malicious one named `<img onerror=...>` cannot attack the tool that is inspecting it.
-- 44 unit tests run on GitHub Actions on `windows-latest`, followed by a real scan of the runner's own clean Windows. The build fails if that clean machine shows a single "investigate".
+- The dashboard binds to `127.0.0.1`, checks the `Host` and `Origin` headers, accepts only real JSON requests, sends a strict Content-Security-Policy, and renders every entry name with `textContent`. A startup entry is untrusted input, so a malicious one named `<img onerror=...>` cannot attack the tool that is inspecting it.
+- PCs without Modern Standby (most desktops) get the same view from their sleep and hibernate wake events, including which scheduled task asked to wake them. Reasons are read from codes, never from the translated message text.
+- 56 unit tests run on GitHub Actions on `windows-latest`, followed by a real scan of the runner's own clean Windows. The build fails if that clean machine shows a single "investigate".
 
 ### What went wrong (and what I learned)
 
 - **My CI found 193 poltergeists on a perfectly clean Windows machine.** The smoke test scans GitHub's Windows runner, and there `Get-AuthenticodeSignature` could not verify Windows' own catalog-signed files, so every System32 binary read "NotSigned". My rule "a task among Windows' tasks whose file isn't from Microsoft" fired 193 times. My laptop never showed this. Now a canary checks `svchost.exe`'s signature first. If Windows can't verify even its own files, Uninvited says so, trusts the Windows folder, and only flags payloads in places Microsoft never installs to. CI now *fails* if a clean runner shows a single "investigate".
+- **My copy-paste commands could have been weaponised.** I asked a second Copilot agent to review the code before publishing. It found that a startup entry *named* something like `Updater$(Start-Process calc)` would have run that code the moment you pasted my "turn it off" command. A malicious entry could have attacked you through the tool that was inspecting it. Every command is now PowerShell with single-quoted literals, where `$()` is just text, and there's a test that tries exactly that name. The same review found that I only inspected the *first* action of a scheduled task (a harmless first action could hide a second one), and that I resolved COM handlers machine-first while Windows does user-first, which hides a known hijacking trick. Both are fixed and tested.
 - **Every file was "missing" in my first scan.** Windows PowerShell 5.1's `ConvertFrom-Json` emits an array as one object, so my `@(...)` wrapped the whole list into a single "path". 320 zombies, all fake.
 - **My tool called Windows Defender a poltergeist.** Defender's engine `MsMpEng.exe` lives in `ProgramData`, which matched my "system file outside the Windows folder" rule. Validly Microsoft-signed files are now exempt.
 - **Every driver helper claimed to be Microsoft.** Drivers are signed by Microsoft's hardware programme, so ASUS, Intel, Realtek and Dolby services all showed "Microsoft Corporation". The real vendor is in the file's version info.
 - **Office was "part of Windows"** because its tasks live under `\Microsoft\`. Only `\Microsoft\Windows\` counts now.
 - **My own label was wrong.** I was sure "ASUS Optimization" handles the Fn keys and labelled it "keep". Gemma said "optional". I checked: the Fn keys belong to ASUS System Control Interface. Gemma was right, and I marked that label as a judgement call.
-- **Windows forgets.** My System log only goes back 9 days, so that's the window. The tool says so instead of pretending it's 30.
+- **Windows forgets.** My System log only goes back 9 days, and it keeps sliding: two hours later the window had shrunk to 8.4 days. The tool reports the real window instead of pretending it's 30 days, and Night Watch keeps its own log, so what happened tonight is still known after Windows forgets it.
 - **`16777220` stays a ghost.** I tried. Uninvited reports it and refuses to guess.
 
 ## Why Does Open Innovation Matter?
@@ -179,7 +181,7 @@ With an open-weight model, the question "what is this?" no longer requires sendi
 
 ## My Agent Session
 
-I built this in one night with GitHub Copilot as my pair programmer in VS Code. It did the research, wrote most of the code and tests, ran the scans and the evaluation on my laptop, and drafted this post. I checked the facts and the numbers. The [commit history](https://github.com/dragon-slayer27/uninvited/commits/main) shows the order things happened in, including the bugs above.
+I built this in one night with GitHub Copilot as my pair programmer in VS Code. It did the research, wrote most of the code and tests, ran the scans and the evaluation on my laptop, and drafted this post. Before publishing, I had a second Copilot agent review the code with fresh eyes. It found the command-injection hole and the multi-action blind spot described above. I checked the facts and the numbers. The [commit history](https://github.com/dragon-slayer27/uninvited/commits/main) shows the order things happened in, including every bug above.
 
 ## The Spirit of It
 
@@ -190,6 +192,6 @@ Día de los Muertos honours what is gone, and Halloween is about what refuses to
 - **Best Use of Gemma:** Gemma 4 E4B (QAT) is the explanation engine for every startup item, the night report and the séance. E2B is evaluated as the low-memory option.
 - **Temporal:** Night Watch is a Temporal workflow with durable timers and retried model activities, plus a durable "explain everything" batch. Tested by taking the model away mid-run.
 - **SerpApi:** opt-in, citation-checked web lookup for items the local model doesn't recognise.
-- **GitHub Copilot:** built with Copilot in VS Code. GitHub Actions runs the tests plus a real scan of a clean Windows runner, and that scan caught a false-alarm bug my laptop couldn't show me.
+- **GitHub Copilot:** built with Copilot in VS Code, and reviewed by a second Copilot agent that found a command-injection hole before launch. GitHub Actions runs the tests plus a real scan of a clean Windows runner, and that scan caught a false-alarm bug my laptop couldn't show me.
 
 *AI disclosure: this project and post were made with substantial help from GitHub Copilot. All numbers come from my own laptop's logs and from the evaluation in the repo.*

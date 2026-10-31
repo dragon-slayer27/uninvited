@@ -139,10 +139,62 @@ def test_disabled_items_are_dormant(entry_factory):
 
 def test_commands_have_an_undo(entry_factory):
     run = rules.commands(rules.analyze(entry_factory()))
-    assert "StartupApproved\\Run" in run["off"] and "0300" in run["off"] and "0200" in run["undo"]
+    assert "StartupApproved\\Run" in run["off"] and "(3,0,0" in run["off"] and "(2,0,0" in run["undo"]
+    assert run["how"].endswith("(PowerShell)") and not run["admin"]
     svc = rules.commands(entry_factory(kind="service", name="MySQL80", scope="machine"))
-    assert svc["off"] == 'sc.exe config "MySQL80" start= demand' and svc["admin"]
+    assert svc["off"] == "Set-Service -Name 'MySQL80' -StartupType Manual" and svc["admin"]
     task = rules.commands(entry_factory(kind="task", location="\\Vendor\\", name="Updater"))
-    assert task["off"] == 'schtasks /Change /TN "\\Vendor\\Updater" /DISABLE'
+    assert task["off"] == "Disable-ScheduledTask -TaskPath '\\Vendor\\' -TaskName 'Updater'"
     zombie = rules.commands(rules.analyze(entry_factory(file={"exists": False})))
-    assert zombie["off"].startswith("reg delete") and zombie["undo"].startswith("reg add")
+    assert zombie["off"].startswith("reg.exe export") and "Remove-ItemProperty" in zombie["off"]
+    assert zombie["undo"].startswith("reg.exe import")
+
+
+def test_commands_cannot_be_hijacked_by_entry_names(entry_factory):
+    # Found in review: a crafted name must not run code when the user pastes "Turn off".
+    evil = "Updater$(Start-Process calc)'; Remove-Item C:\\x; '"
+    for kind in ("run", "task", "service"):
+        out = rules.commands(rules.analyze(entry_factory(kind=kind, name=evil, location="\\Vendor\\" if kind == "task" else
+                                                         r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run")))
+        assert rules.ps_literal(evil) in out["off"], kind
+        assert rules.ps_literal(evil) == "'Updater$(Start-Process calc)''; Remove-Item C:\\x; '''"
+    startup = rules.commands(entry_factory(kind="startup", shortcut=r"C:\Users\x\Startup\a$(calc).lnk"))
+    assert "-LiteralPath 'C:\\Users\\x\\Startup\\a$(calc).lnk'" in startup["off"]
+
+
+def test_policy_run_entries_are_deleted_not_switched(entry_factory):
+    e = rules.analyze(entry_factory(location=r"HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run"))
+    out = rules.commands(e)
+    assert "Remove-ItemProperty" in out["off"] and "StartupApproved" not in out["off"] and out["admin"]
+
+
+def test_tasks_need_admin_unless_they_run_as_you(entry_factory, monkeypatch):
+    monkeypatch.setenv("USERNAME", "alex")
+    mine = rules.commands(entry_factory(kind="task", location="\\", name="T", run_as="PC\\alex"))
+    system = rules.commands(entry_factory(kind="task", location="\\", name="T", run_as="SYSTEM"))
+    assert not mine["admin"] and system["admin"]
+
+
+def test_com_hijack_of_a_windows_task_is_flagged(entry_factory):
+    e = entry_factory(kind="task", location="\\Microsoft\\Windows\\Shell\\", com_scope="user",
+                      target=r"C:\Users\x\AppData\Roaming\shell.dll", command="COM handler {AB}")
+    e["file"] = {"exists": True, "sigStatus": "NotSigned"}
+    e = rules.analyze(e)
+    assert "com-hijack" in {f["id"] for f in e["flags"]}
+    assert rules.decide(e)[0] == "investigate"
+
+
+def test_unsigned_tool_on_another_drive_is_not_a_poltergeist(entry_factory):
+    e = entry_factory(target=r"D:\Apps\tool\tool.exe")
+    e["file"] = {"exists": True, "sigStatus": "NotSigned"}
+    e = rules.analyze(e)
+    assert [f["id"] for f in e["flags"]] == ["unsigned"]
+    assert rules.decide(e, {"category": "productivity", "confidence": "high"})[0] == "optional"
+
+
+def test_unexpanded_paths_classify_like_real_ones():
+    assert rules.path_class(r"%APPDATA%\PrinterHelper\update.vbs") == "appdata"
+    assert rules.path_class(r"%LOCALAPPDATA%\Temp\x.exe") == "temp"
+    assert rules.path_class(r"%USERPROFILE%\Downloads\setup.exe") == "downloads"
+    assert rules.path_class(r"%USERPROFILE%\AppData\Local\Temp\svchost.exe") == "temp"
+    assert rules.path_class(r"%PUBLIC%\Libraries\a.dll") == "public"

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 # Reason codes observed in Kernel-Power 506/507 events. Message text is used when present
 # (it is localised), the code table is the fallback.
@@ -64,12 +64,15 @@ def _num(value) -> float | None:
 
 
 def reason_of(event: dict) -> tuple[int | None, str]:
+    """Known reason codes win over the message text, which Windows translates into the user's language."""
     data = event.get("data") or {}
     code = _num(data.get("Reason"))
     code = int(code) if code is not None else None
+    if code in KNOWN_REASONS:
+        return code, KNOWN_REASONS[code]
     text = (event.get("reasonText") or "").strip()
     if not text or text.isdigit():
-        text = KNOWN_REASONS.get(code, str(code) if code is not None else "unknown")
+        text = str(code) if code is not None else "unknown"
     return code, text
 
 
@@ -142,13 +145,55 @@ def _session(enter: dict | None, leave: dict) -> dict:
     }
 
 
+def classify_source(text: str) -> str:
+    """Wake source of a classic sleep/hibernate resume (Power-Troubleshooter event)."""
+    t = (text or "").lower()
+    if not t or t == "unknown":
+        return "unknown"
+    if "timer" in t:
+        return "windows"
+    if "power button" in t or "lid" in t:
+        return "you"
+    if any(k in t for k in ("keyboard", "mouse", "touchpad", "hid", "input")):
+        return "you"
+    if any(k in t for k in ("ethernet", "wi-fi", "wifi", "wireless", "network", "lan", "realtek pcie")):
+        return "windows"
+    return "unknown"
+
+
+def classic_wakes(sleep_wakes: list[dict]) -> list[dict]:
+    """Turn sleep/hibernate resumes into session-like records, for PCs without Modern Standby."""
+    out = []
+    for w in sleep_wakes or []:
+        d = w.get("data") or {}
+        end = parse_time(d.get("WakeTime")) or parse_time(w.get("time"))
+        start = parse_time(d.get("SleepTime"))
+        source = (d.get("WakeSourceText") or "").strip() or "Unknown"
+        local_end = end.astimezone() if end else None
+        out.append({
+            "start": start, "end": end, "local_end": local_end,
+            "hour": local_end.hour if local_end else None,
+            "night": bool(local_end and NIGHT_START <= local_end.hour < NIGHT_END),
+            "duration_s": (end - start).total_seconds() if (start and end and end > start) else 0.0,
+            "drips_pct": None, "active_s": None, "on_ac": None, "drained_pct": None, "battery_health_pct": None,
+            "lid_closed": False, "code": None, "reason": source, "enter_reason": "", "class": classify_source(source),
+            "awake_after_s": None,
+        })
+    return sorted(out, key=lambda s: s["end"] or datetime.min.replace(tzinfo=timezone.utc))
+
+
 def analyze(scan: dict, now: datetime | None = None) -> dict:
     sess = sessions(scan.get("standby") or [])
+    mode = "modern-standby"
+    if not sess and scan.get("sleep_wakes"):
+        sess, mode = classic_wakes(scan["sleep_wakes"]), "classic-sleep"
+    elif not sess:
+        mode = "none"
     now = now or parse_time(scan.get("collected_at")) or datetime.now(timezone.utc)
-    start = parse_time(scan.get("log_start"))
-    if sess and sess[0].get("end") and (start is None or sess[0]["end"] < start):
-        start = sess[0]["start"] or sess[0]["end"]
-    days = max(((now - start).total_seconds() / 86400) if start else 0.0, 0.0)
+    query_start = now - timedelta(days=scan.get("days") or 30)
+    log_start = parse_time(scan.get("log_start"))
+    start = max(log_start, query_start) if log_start else query_start
+    days = max((now - start).total_seconds() / 86400, 0.0)
 
     by_class = Counter(s["class"] for s in sess)
     night = [s for s in sess if s["night"]]
@@ -168,25 +213,32 @@ def analyze(scan: dict, now: datetime | None = None) -> dict:
     drips_weighted = [s for s in sess if s["drips_pct"] is not None and s["duration_s"] > 0]
     drips_avg = (sum(s["drips_pct"] * s["duration_s"] for s in drips_weighted)
                  / sum(s["duration_s"] for s in drips_weighted)) if drips_weighted else None
-    active_min = sum((s["active_s"] or 0) for s in sess) / 60
+    active_min = sum((s["active_s"] or 0) for s in sess) / 60 if mode == "modern-standby" else None
 
     austerity = [s for s in sess if "austerity" in s["reason"].lower()]
     austerity_nights = sorted({s["local_end"].date().isoformat() for s in austerity if s["local_end"] and s["night"]})
-    unknown_codes = Counter(str(s["code"]) for s in sess if s["class"] == "unknown")
+    unknown_codes = Counter(str(s["code"]) for s in sess if s["class"] == "unknown" and s["code"] is not None)
     lid_closed_input = [s for s in sess if s["reason"].lower().startswith("input") and s["lid_closed"]]
     brief_night = [s for s in night if s["class"] in ("you", "unknown") and s["awake_after_s"] is not None and s["awake_after_s"] < 60]
+    timer_wakes = [s for s in sess if s["reason"].lower().startswith("timer")]
 
     sleep_wakes = scan.get("sleep_wakes") or []
-    wake_sources = Counter((w.get("source") or "Unknown") for w in sleep_wakes)
+    wake_sources = Counter(((w.get("data") or {}).get("WakeSourceText") or "").strip() or "Unknown" for w in sleep_wakes)
     health = next((s["battery_health_pct"] for s in reversed(sess) if s.get("battery_health_pct")), None)
 
     timers = scan.get("wake_timers") or {}
-    tips = _tips(len(austerity), len(lid_closed_input), timers, unknown_codes, scan.get("wake_armed") or [])
+    tips = _tips(len(austerity), len(lid_closed_input), timers, unknown_codes, scan.get("wake_armed") or [], len(timer_wakes))
 
     def _round(x, n=1):
         return round(x, n) if x is not None else None
 
+    def _note(reason: str) -> str:
+        if reason.lower().startswith("timer"):
+            return "A scheduled task asked Windows to wake the PC so it could run."
+        return REASON_NOTES.get(reason.lower(), "")
+
     return {
+        "mode": mode,
         "window_days": _round(days, 1),
         "window_start": start.isoformat() if start else None,
         "exits": len(sess),
@@ -197,7 +249,7 @@ def analyze(scan: dict, now: datetime | None = None) -> dict:
         "night_not_you": len(night) - night_by_class.get("you", 0),
         "hist": hist,
         "reasons": dict(reasons.most_common()),
-        "reason_notes": {r: REASON_NOTES.get(r.lower(), "") for r in reasons},
+        "reason_notes": {r: _note(r) for r in reasons},
         "standby_hours": _round(total_s / 3600, 1),
         "hours_on_battery": _round(hours_on_battery, 1),
         "battery_drained_pct": _round(drained_total, 1),
@@ -205,10 +257,11 @@ def analyze(scan: dict, now: datetime | None = None) -> dict:
         "worst_session": _brief(worst),
         "deep_sleep_pct": _round(drips_avg, 1),
         "awake_minutes": _round(active_min, 1),
-        "awake_hours": _round(active_min / 60, 1),
-        "awake_share_pct": _round(active_min / 60 / (total_s / 3600) * 100, 1) if total_s else None,
+        "awake_hours": _round(active_min / 60, 1) if active_min is not None else None,
+        "awake_share_pct": _round(active_min / 60 / (total_s / 3600) * 100, 1) if (active_min is not None and total_s) else None,
         "austerity_count": len(austerity),
         "austerity_nights": austerity_nights,
+        "timer_wakes": len(timer_wakes),
         "unknown_codes": dict(unknown_codes),
         "lid_closed_input": len(lid_closed_input),
         "brief_night_wakes": len(brief_night),
@@ -240,8 +293,17 @@ def _brief(s: dict | None) -> dict | None:
     }
 
 
-def _tips(austerity: int, lid_closed_input: int, timers: dict, unknown: Counter, armed: list[str]) -> list[dict]:
+def _tips(austerity: int, lid_closed_input: int, timers: dict, unknown: Counter, armed: list[str],
+          timer_wakes: int = 0) -> list[dict]:
     tips = []
+    if timer_wakes:
+        tips.append({
+            "id": "timer-wakes",
+            "title": "Scheduled tasks are waking the PC",
+            "text": (f"{timer_wakes} wakes came from wake timers. 'powercfg /waketimers' (admin) names the task; in Task Scheduler, "
+                     "untick 'Wake the computer to run this task', or set Power Options > Change plan settings > Advanced > "
+                     "Sleep > Allow wake timers to Disable."),
+        })
     if austerity:
         tips.append({
             "id": "austerity",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import ntpath
+import os
 import re
 
 from . import cmdline
@@ -39,10 +40,22 @@ SYSTEM_NAMES = {
 }
 
 
+_ENV_PREFIX = {
+    "%temp%": "temp", "%tmp%": "temp", "%public%": "public", "%programdata%": "programdata",
+    "%appdata%": "appdata", "%localappdata%": "appdata",
+}
+
+
 def path_class(path: str) -> str:
     low = cmdline.norm(path)
     if not low:
         return "none"
+    # Anonymised or unexpanded paths (%APPDATA%\...) must classify like the real ones.
+    for prefix, cls in _ENV_PREFIX.items():
+        if low.startswith(prefix):
+            return "temp" if "\\temp\\" in low else cls
+    if low.startswith("%userprofile%"):
+        low = "c:\\users\\you" + low[len("%userprofile%"):]
     win = cmdline.norm(cmdline.windir())
     if "\\appdata\\local\\temp\\" in low or low.startswith(win + "\\temp\\") or re.match(r"^[a-z]:\\temp\\", low):
         return "temp"
@@ -63,7 +76,7 @@ def path_class(path: str) -> str:
     return "other"
 
 
-USER_WRITABLE = {"temp", "recycle", "public", "downloads", "appdata", "programdata", "other"}
+USER_WRITABLE = {"temp", "recycle", "public", "downloads", "appdata", "programdata"}
 
 # ------------------------------------------------------------ command lines
 CMD_PATTERNS = [
@@ -174,6 +187,8 @@ def analyze(entry: dict, signatures_ok: bool = True) -> dict:
             else:
                 flags.append(_flag("unsigned", "low", "Not digitally signed by its publisher."))
     host = ntpath.basename(entry.get("exe") or "").lower()
+    if entry.get("com_scope") == "user" and location.startswith("\\microsoft\\"):
+        flags.append(_flag("com-hijack", "high", "A per-user registration replaces the component this Windows task loads, a known way to hide malware (COM hijacking)."))
     if host in SCRIPT_HOSTS and target and target != entry.get("exe") and pclass in USER_WRITABLE and not entry["zombie"]:
         flags.append(_flag("script-from-user-folder", "medium", f"{host} runs a script from a folder any program can write to."))
     if _HIDDEN.search(command) and host in {"powershell.exe", "pwsh.exe"}:
@@ -249,50 +264,75 @@ def decide(entry: dict, explanation: dict | None = None) -> tuple[str, str]:
 
 
 # ------------------------------------------------------------------ commands
-def _reg_escape(text: str) -> str:
-    return text.replace('"', '\\"')
+def ps_literal(text: str) -> str:
+    """A PowerShell single-quoted literal: no variable or $() expansion, quotes doubled."""
+    return "'" + (text or "").replace("'", "''") + "'"
+
+
+def _reg_ps_path(location: str) -> str:
+    hive, _, rest = (location or "").partition("\\")
+    return f"{hive}:\\{rest}"
+
+
+def _runs_as_current_user(run_as: str | None) -> bool:
+    user = (os.environ.get("USERNAME") or "").lower()
+    who = (run_as or "").lower()
+    return bool(user) and (who == user or who.endswith("\\" + user))
 
 
 def commands(entry: dict) -> dict:
-    """How to turn it off and how to undo that. Uninvited never runs these itself."""
+    """PowerShell commands to turn an entry off and to undo that. Uninvited never runs them itself.
+
+    Every name and path is a single-quoted literal, so a startup entry cannot smuggle code into
+    the command you copy.
+    """
     kind = entry.get("kind")
     name = entry.get("name") or ""
     location = entry.get("location") or ""
-    admin = entry.get("scope") != "user"
     if kind == "run":
-        if entry.get("zombie"):
-            off = f'reg delete "{location}" /v "{name}" /f'
-            undo = f'reg add "{location}" /v "{name}" /t REG_SZ /d "{_reg_escape(entry.get("command") or "")}" /f'
-            how = "Delete the leftover registry value."
+        admin = location.upper().startswith("HKLM")
+        key = ps_literal(_reg_ps_path(location))
+        if entry.get("zombie") or "\\policies\\" in location.lower():
+            backup = '"$env:USERPROFILE\\uninvited-run-backup.reg"'
+            off = (f"reg.exe export {ps_literal(location)} {backup} /y; "
+                   f"Remove-ItemProperty -Path {key} -Name {ps_literal(name)}")
+            undo = f"reg.exe import {backup}"
+            how = "Back up the registry key, then delete the value."
         else:
             hive = location.split("\\", 1)[0]
             sub = "Run32" if "wow6432node" in location.lower() else "Run"
-            key = f"{hive}\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\{sub}"
-            off = f'reg add "{key}" /v "{name}" /t REG_BINARY /d 030000000000000000000000 /f'
-            undo = f'reg add "{key}" /v "{name}" /t REG_BINARY /d 020000000000000000000000 /f'
-            how = "Same as Task Manager > Startup apps > Disable."
+            approved = ps_literal(f"{hive}:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\{sub}")
+            off = (f"New-ItemProperty -Path {approved} -Name {ps_literal(name)} -PropertyType Binary "
+                   f"-Value ([byte[]](3,0,0,0,0,0,0,0,0,0,0,0)) -Force")
+            undo = (f"New-ItemProperty -Path {approved} -Name {ps_literal(name)} -PropertyType Binary "
+                    f"-Value ([byte[]](2,0,0,0,0,0,0,0,0,0,0,0)) -Force")
+            how = "Same switch as Task Manager > Startup apps > Disable."
     elif kind == "startup":
         shortcut = entry.get("shortcut") or ""
-        base = ntpath.basename(shortcut)
-        off = (f'New-Item -ItemType Directory -Force "$env:USERPROFILE\\Uninvited-Graveyard" | Out-Null; '
-               f'Move-Item -LiteralPath "{shortcut}" -Destination "$env:USERPROFILE\\Uninvited-Graveyard\\"')
-        undo = f'Move-Item -LiteralPath "$env:USERPROFILE\\Uninvited-Graveyard\\{base}" -Destination "{ntpath.dirname(shortcut)}\\"'
-        how = "Move the shortcut out of the Startup folder (PowerShell)."
+        grave = "(Join-Path $env:USERPROFILE 'Uninvited-Graveyard')"
+        off = (f"New-Item -ItemType Directory -Force -Path {grave} | Out-Null; "
+               f"Move-Item -LiteralPath {ps_literal(shortcut)} -Destination {grave}")
+        undo = (f"Move-Item -LiteralPath (Join-Path {grave} {ps_literal(ntpath.basename(shortcut))}) "
+                f"-Destination {ps_literal(ntpath.dirname(shortcut))}")
+        how = "Move the shortcut out of the Startup folder."
+        admin = entry.get("scope") == "machine"
     elif kind == "task":
-        tn = f"{location}{name}"
+        where = f"-TaskPath {ps_literal(location)} -TaskName {ps_literal(name)}"
+        admin = not _runs_as_current_user(entry.get("run_as"))
         if entry.get("zombie"):
-            off = f'schtasks /Query /TN "{tn}" /XML > "%USERPROFILE%\\uninvited-task-backup.xml" && schtasks /Delete /TN "{tn}" /F'
-            undo = f'schtasks /Create /TN "{tn}" /XML "%USERPROFILE%\\uninvited-task-backup.xml"'
-            how = "Back up the task, then delete it (Command Prompt)."
+            backup = '"$env:USERPROFILE\\uninvited-task-backup.xml"'
+            off = f"Export-ScheduledTask {where} | Out-File {backup}; Unregister-ScheduledTask {where} -Confirm:$false"
+            undo = f"Register-ScheduledTask {where} -Xml (Get-Content {backup} -Raw)"
+            how = "Back up the task, then delete it."
         else:
-            off = f'schtasks /Change /TN "{tn}" /DISABLE'
-            undo = f'schtasks /Change /TN "{tn}" /ENABLE'
-            how = "Disable the scheduled task (Command Prompt)."
+            off = f"Disable-ScheduledTask {where}"
+            undo = f"Enable-ScheduledTask {where}"
+            how = "Disable the scheduled task."
     elif kind == "service":
-        off = f'sc.exe config "{name}" start= demand'
-        undo = f'sc.exe config "{name}" start= auto'
+        off = f"Set-Service -Name {ps_literal(name)} -StartupType Manual"
+        undo = f"Set-Service -Name {ps_literal(name)} -StartupType Automatic"
         how = "Switch the service to Manual: it starts only when something needs it."
         admin = True
     else:
         return {"how": "Nothing to do: it removes itself after running once.", "off": "", "undo": "", "admin": False}
-    return {"how": how, "off": off, "undo": undo, "admin": admin}
+    return {"how": how + " (PowerShell)", "off": off, "undo": undo, "admin": admin}

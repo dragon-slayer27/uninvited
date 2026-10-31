@@ -417,6 +417,12 @@ def wake_stats_for_story(w: dict) -> dict:
 
 def fallback_story(w: dict) -> dict:
     s = wake_stats_for_story(w)
+    if w.get("mode") == "classic-sleep" or s.get("awake_hours") is None:
+        headline = f"{s.get('not_you', 0)} of {s.get('exits', 0)} wakes weren't you"
+        story = (f"Over the last {s.get('window_days')} days the PC woke from sleep {s.get('exits', 0)} times, "
+                 f"{s.get('night_exits', 0)} of them between midnight and 6 AM. "
+                 f"Scheduled tasks asked for {w.get('timer_wakes') or 0} of those wakes.")
+        return {"headline": headline, "story": story, "source": "template"}
     headline = f"{s.get('not_you', 0)} of {s.get('exits', 0)} standby exits weren't you"
     story = (f"Over the last {s.get('window_days')} days the laptop spent {s.get('standby_hours')} hours in standby, "
              f"but it was really awake for {s.get('awake_hours')} of them. "
@@ -466,15 +472,21 @@ def grounded_explain(entry: dict, results: list[dict], client: Ollama | None = N
 def wake_facts(w: dict) -> str:
     """The wake summary as plain sentences, so the model never sees (or repeats) field names."""
     if not w or not w.get("exits"):
-        return "No standby exits were recorded."
+        return "No standby exits or wakes were recorded."
+    classic = w.get("mode") == "classic-sleep"
+    noun = "woke from sleep" if classic else "left standby"
     lines = [
-        f"In the last {w.get('window_days')} days the laptop left standby {w.get('exits')} times; "
+        f"In the last {w.get('window_days')} days the PC {noun} {w.get('exits')} times; "
         f"{w.get('not_you')} of those were not caused by the user.",
-        f"Between midnight and 6 AM it left standby {w.get('night_exits')} times; {w.get('night_not_you')} of those were not the user.",
-        f"It spent {w.get('standby_hours')} hours in standby and was really awake for {w.get('awake_hours')} of them.",
-        f"Windows had to clamp down on battery drain in standby {w.get('austerity_count')} times, "
-        f"on {len(w.get('austerity_nights') or [])} different nights.",
+        f"Between midnight and 6 AM it {noun} {w.get('night_exits')} times; {w.get('night_not_you')} of those were not the user.",
     ]
+    if w.get("awake_hours") is not None:
+        lines.append(f"It spent {w.get('standby_hours')} hours in standby and was really awake for {w.get('awake_hours')} of them.")
+    if w.get("austerity_count"):
+        lines.append(f"Windows had to clamp down on battery drain in standby {w.get('austerity_count')} times, "
+                     f"on {len(w.get('austerity_nights') or [])} different nights.")
+    if w.get("timer_wakes"):
+        lines.append(f"Scheduled tasks asked Windows to wake the PC {w.get('timer_wakes')} times.")
     reasons = sorted((w.get("reasons") or {}).items(), key=lambda kv: -kv[1])
     lines.append("Reasons Windows recorded: " + "; ".join(f"{r}: {n} times" for r, n in reasons) + ".")
     for r, note in (w.get("reason_notes") or {}).items():

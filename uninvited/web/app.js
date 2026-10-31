@@ -118,11 +118,20 @@ function renderHero(r) {
   const s = r.summary;
   const nights = (w.austerity_nights || []).length;
   const days = Math.round(w.window_days || 0);
+  const guests = stat("purple", s.guests, "", "things start without asking", `${s.zombies} zombies · ${s.poltergeists} poltergeists · ${s.optional} optional`);
+  if (w.mode === "classic-sleep" || w.mode === "none") {
+    $("#hero").replaceChildren(
+      stat("orange", w.exits, "", `times woken from sleep in ${days} days`, `${w.not_you} weren't you`),
+      stat("teal", w.night_exits, "", "wakes between midnight and 6 AM", `${w.night_not_you} weren't you`),
+      stat("red", w.timer_wakes || 0, "", "wakes asked for by scheduled tasks", "wake timers"),
+      guests);
+    return;
+  }
   $("#hero").replaceChildren(
     stat("orange", w.exits, "", `times out of standby in ${days} days`, `${w.not_you} weren't you · ${w.night_exits} between midnight and 6 AM`),
     stat("teal", w.awake_hours, "h", "awake while 'asleep'", `out of ${w.standby_hours} h in standby · deep sleep ${w.deep_sleep_pct ?? "?"}% of the time`),
     stat("red", w.austerity_count, "", "times Windows had to step in", `standby used more battery than allowed · on ${nights} night${nights === 1 ? "" : "s"}`),
-    stat("purple", s.guests, "", "things start without asking", `${s.zombies} zombies · ${s.poltergeists} poltergeists · ${s.optional} optional`),
+    guests,
   );
 }
 
@@ -195,8 +204,9 @@ function renderChart(w) {
 
 function classOf(reason) {
   const t = reason.toLowerCase();
-  if (/^\d+$/.test(t)) return "unknown";
-  if (t.startsWith("input") || t === "lid" || t === "power button") return "you";
+  if (/^\d+$/.test(t) || t === "unknown") return "unknown";
+  if (t.startsWith("timer")) return "windows";
+  if (t.startsWith("input") || t === "lid" || t === "power button" || /keyboard|mouse|touchpad|hid/.test(t)) return "you";
   if (t.includes("ac/dc")) return "charger";
   return "windows";
 }

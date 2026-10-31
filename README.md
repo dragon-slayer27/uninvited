@@ -20,7 +20,7 @@ From nine days of my own Windows event log (`python -m uninvited scan`):
 
 | Ghost | What it is | How Uninvited knows |
 |---|---|---|
-| 🌙 **Night wakers** | What pulled the laptop out of Modern Standby, and what that cost in battery | Kernel-Power events 506/507 and Power-Troubleshooter events, parsed from the event *fields* (not the localised text) |
+| 🌙 **Night wakers** | What pulled the laptop out of Modern Standby, and what that cost in battery. On PCs without Modern Standby: what woke them from sleep, including which scheduled task asked to | Kernel-Power events 506/507 and Power-Troubleshooter events, parsed from the event *fields* and reason codes (not the translated text) |
 | 👻 **Uninvited guests** | Registry Run/RunOnce keys, Startup folder, scheduled tasks, auto-start services | Read-only collectors, Authenticode signatures, file version info, Task Manager's own enable/disable switches |
 | 🧟 **Zombies** and 🪤 **poltergeists** | Entries pointing at programs that no longer exist; entries that look like malware persistence | Deterministic rules: missing files, encoded PowerShell (decoded for you), LOLBins (`mshta`, `rundll32`, `regsvr32`, `certutil`), system-file look-alikes, unsigned files in writable folders |
 
@@ -118,8 +118,8 @@ When Gemma doesn't recognise something, the card offers **Ask the web**. Only th
 ## Privacy
 
 - **Read-only.** Uninvited reads the registry, the task scheduler, services and the System event log. It never changes them.
-- **Local.** The dashboard binds to `127.0.0.1`, checks the `Host` header, and loads nothing from the internet. The model runs in Ollama on your machine.
-- **Anonymised by default.** Your username and account SID are scrubbed from everything the model and the dashboard see.
+- **Local.** The dashboard binds to `127.0.0.1`, checks the `Host` and `Origin` headers, accepts only JSON requests, and loads nothing from the internet. The model runs in Ollama on your machine.
+- **Anonymised for the model.** Your username, PC name and account SID are scrubbed from everything the model sees and from what the dashboard displays. The one exception is the copy-paste "turn it off" commands, which have to contain the real names to work.
 - **The one exception** is the opt-in web lookup above.
 
 Your startup list says a lot about you: your VPN, your exam software, your games, your employer's tools. That list is exactly what you would otherwise paste into a cloud chatbot or a "what is this .exe" website. With an open-weight model it never has to leave the laptop.
@@ -138,7 +138,7 @@ Your startup list says a lot about you: your VPN, your exam software, your games
 - **Temporal** (MIT) for Night Watch, using the local dev server.
 - **SerpApi** for the opt-in lookup.
 - Python standard library only for the scanner, the rules and the dashboard (no build step, no CDN).
-- Built during Hacktoberfest 2026 ("Ghost in the Machine") with **GitHub Copilot** as a pair programmer. 44 tests and a real scan of a clean Windows machine run on GitHub Actions (`windows-latest`); the build fails on any false alarm.
+- Built during Hacktoberfest 2026 ("Ghost in the Machine") with **GitHub Copilot** as a pair programmer, and a second Copilot agent as reviewer. 56 tests and a real scan of a clean Windows machine run on GitHub Actions (`windows-latest`); the build fails on any false alarm.
 
 ## License
 

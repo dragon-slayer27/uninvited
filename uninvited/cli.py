@@ -48,10 +48,14 @@ def _current(args) -> dict:
 
 
 def print_wakes(w: dict) -> None:
+    classic = w.get("mode") == "classic-sleep"
     print(_c("b", f"\n🌙 Night wakers — last {w['window_days']} days of the System log"))
-    print(f"  Left standby {_c('b', str(w['exits']))} times; {_c('org', str(w['not_you']))} of them weren't you "
+    if w.get("mode") == "none":
+        print("  No standby exits or sleep wakes recorded in that time.")
+    verb = "Woke from sleep" if classic else "Left standby"
+    print(f"  {verb} {_c('b', str(w['exits']))} times; {_c('org', str(w['not_you']))} of them weren't you "
           f"({w['night_exits']} between midnight and 6 AM, {w['night_not_you']} not you).")
-    if w.get("standby_hours"):
+    if w.get("awake_hours") is not None and w.get("standby_hours"):
         print(f"  {w['standby_hours']} h in standby, but awake for {_c('org', str(w.get('awake_hours')))} h of it "
               f"(deep sleep {w.get('deep_sleep_pct')}% of the time).")
     if w.get("hours_on_battery"):

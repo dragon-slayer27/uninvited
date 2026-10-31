@@ -24,7 +24,6 @@ def _display(entry: dict) -> dict:
         "kind": entry.get("kind"),
         "scope": entry.get("scope"),
         "name": ai.anonymize(entry.get("display_name") or entry.get("name") or ""),
-        "raw_name": entry.get("name"),
         "location": ai.anonymize(entry.get("location") or ""),
         "description": entry.get("description") or "",
         "command": ai.anonymize(entry.get("command") or ""),

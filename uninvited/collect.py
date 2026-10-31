@@ -83,15 +83,15 @@ def _reg_string(hive: str, path: str, value: str = "") -> str | None:
     return data if isinstance(data, str) else None
 
 
-def _com_dll(class_id: str) -> str | None:
+def _com_dll(class_id: str) -> tuple[str | None, str | None]:
+    """Resolve a COM handler like Windows does: a per-user registration overrides the machine one."""
     if not class_id or winreg is None:
-        return None
-    for hive, path in (("HKLM", rf"Software\Classes\CLSID\{class_id}\InprocServer32"),
-                       ("HKCU", rf"Software\Classes\CLSID\{class_id}\InprocServer32")):
-        dll = _reg_string(hive, path)
+        return None, None
+    for hive, scope in (("HKCU", "user"), ("HKLM", "machine")):
+        dll = _reg_string(hive, rf"Software\Classes\CLSID\{class_id}\InprocServer32")
         if dll:
-            return cmdline.expand(dll)
-    return None
+            return cmdline.expand(dll), scope
+    return None, None
 
 
 def registry_entries() -> list[dict]:
@@ -193,46 +193,48 @@ def describe_triggers(triggers: list[dict]) -> str:
 
 # ---------------------------------------------------------------- assemble
 def _task_entries(tasks: list[dict]) -> list[dict]:
+    """One entry per action: a harmless first action must not hide a second one."""
     entries = []
     for t in tasks or []:
-        actions = t.get("actions") or []
-        exec_action = next((a for a in actions if a.get("type") == "exec"), None)
-        com_action = next((a for a in actions if a.get("type") == "com"), None)
-        if exec_action:
-            # Some vendors store Execute with doubled quotes (""C:\...exe""); normalise first.
-            execute = (exec_action.get("execute") or "").strip().strip('"').strip()
-            arguments = exec_action.get("arguments") or ""
-            command = f'"{execute}"' if " " in execute else execute
-            command = f"{command} {arguments}".strip()
-            exe, args, target = cmdline.target_of(command)
-        elif com_action:
-            dll = _com_dll(com_action.get("classId") or "")
-            command = f"COM handler {com_action.get('classId')}"
-            exe, args, target = (dll or ""), "", (dll or "")
-        else:
-            continue
-        location = t.get("path") or "\\"
-        state = t.get("state") or ""
-        entries.append({
-            "id": entry_id("task", location, t.get("name") or ""),
-            "kind": "task",
-            "scope": "machine" if (t.get("runAs") or "").upper() in ("SYSTEM", "LOCAL SERVICE", "NETWORK SERVICE") else "user",
-            "location": location,
-            "name": t.get("name") or "",
-            "display_name": t.get("name") or "",
-            "description": t.get("description") or "",
-            "author": t.get("author") or "",
-            "command": command,
-            "exe": exe,
-            "args": args,
-            "target": target,
-            "enabled": state.lower() != "disabled",
-            "state": state,
-            "trigger": describe_triggers(t.get("triggers") or []),
-            "wake_to_run": bool(t.get("wakeToRun")),
-            "run_as": t.get("runAs") or "",
-            "task_info": t.get("info"),
-        })
+        runnable = [a for a in (t.get("actions") or []) if a.get("type") in ("exec", "com")]
+        for index, action in enumerate(runnable):
+            com_scope = None
+            if action.get("type") == "exec":
+                # Some vendors store Execute with doubled quotes (""C:\...exe""); normalise first.
+                execute = (action.get("execute") or "").strip().strip('"').strip()
+                arguments = action.get("arguments") or ""
+                command = f'"{execute}"' if " " in execute else execute
+                command = f"{command} {arguments}".strip()
+                exe, args, target = cmdline.target_of(command)
+            else:
+                dll, com_scope = _com_dll(action.get("classId") or "")
+                command = f"COM handler {action.get('classId')}"
+                exe, args, target = (dll or ""), "", (dll or "")
+            location = t.get("path") or "\\"
+            name = t.get("name") or ""
+            key = name if index == 0 else f"{name}#{index}"
+            state = t.get("state") or ""
+            entries.append({
+                "id": entry_id("task", location, key),
+                "kind": "task",
+                "scope": "machine" if (t.get("runAs") or "").upper() in ("SYSTEM", "LOCAL SERVICE", "NETWORK SERVICE") else "user",
+                "location": location,
+                "name": name,
+                "display_name": name if len(runnable) == 1 else f"{name} (action {index + 1} of {len(runnable)})",
+                "description": t.get("description") or "",
+                "author": t.get("author") or "",
+                "command": command,
+                "exe": exe,
+                "args": args,
+                "target": target,
+                "com_scope": com_scope,
+                "enabled": state.lower() != "disabled",
+                "state": state,
+                "trigger": describe_triggers(t.get("triggers") or []),
+                "wake_to_run": bool(t.get("wakeToRun")),
+                "run_as": t.get("runAs") or "",
+                "task_info": t.get("info"),
+            })
     return entries
 
 
@@ -339,6 +341,7 @@ def _attach_running(entries: list[dict], processes: list[dict]) -> None:
 def _attach_file_info(entries: list[dict], workdir: Path) -> bool:
     """Attach file facts to every entry. Returns whether Windows can verify its own signatures here."""
     import json
+    import uuid
 
     canary = ntpath.join(cmdline.windir(), "System32", "svchost.exe")
     paths: dict[str, str] = {cmdline.norm(canary): canary}
@@ -346,10 +349,12 @@ def _attach_file_info(entries: list[dict], workdir: Path) -> bool:
         t = e.get("target") or ""
         if t:
             paths.setdefault(cmdline.norm(t), t)
-    listing = workdir / "paths.json"
-    listing.write_text(json.dumps(list(paths.values())), encoding="utf-8")
-    raw = run_script("fileinfo.ps1", workdir, InPath=str(listing)) or {}
-    listing.unlink(missing_ok=True)
+    listing = workdir / f"paths-{uuid.uuid4().hex}.json"  # unique: the UI and Night Watch may scan at once
+    try:
+        listing.write_text(json.dumps(list(paths.values())), encoding="utf-8")
+        raw = run_script("fileinfo.ps1", workdir, InPath=str(listing)) or {}
+    finally:
+        listing.unlink(missing_ok=True)
     infos = {cmdline.norm(k): v for k, v in raw.items()}
     for e in entries:
         e["file"] = infos.get(cmdline.norm(e.get("target") or ""), {"exists": False})

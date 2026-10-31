@@ -150,8 +150,12 @@ def make_handler(state: State):
         def do_POST(self):
             if not self._host_ok():
                 return self._json({"error": "forbidden host"}, 403)
-            if "application/json" not in (self.headers.get("Content-Type") or ""):
+            # Exact type check: "text/plain;x=application/json" is CORS-safelisted and must not pass.
+            if self.headers.get_content_type() != "application/json":
                 return self._json({"error": "JSON only"}, 415)
+            origin = self.headers.get("Origin")
+            if origin and urlparse(origin).hostname not in ALLOWED_HOSTS:
+                return self._json({"error": "cross-origin request refused"}, 403)
             path = urlparse(self.path).path
             body = self._body()
             try:
