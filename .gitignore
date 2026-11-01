@@ -6,6 +6,7 @@ __pycache__/
 build/
 dist/
 .env
+.vscode/
 uninvited-summary*.json
 eval/runs/
 docs/video/

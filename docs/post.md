@@ -142,6 +142,13 @@ I tested the part that matters. I started a worker that could not reach the mode
 
 ![Temporal retrying](https://raw.githubusercontent.com/dragon-slayer27/uninvited/main/docs/img/temporal-retrying.png)
 
+Then I left it on duty for real and closed the lid at 2 AM. My morning report, written by the workflow while I slept:
+
+> **6 standby exits since 02:07; 4 were not you.**
+> 04:18, Windows clamps down on battery drain in standby (the 10th night in a row) · 08:00, lid (me) · 09:32 and 09:33, reason `16777220`, twice · 10:15, the charger, then the lid (me)
+
+The ghost with no name knocked twice while I was getting ready.
+
 ### 5. Web lookup with SerpApi, opt-in
 
 Sometimes Gemma just doesn't know, or worse, doesn't know that it doesn't know. It confidently called Chrome's undocumented "Platform Experience Helper" an updater. It isn't one, and since July it has been blamed for a blank white window that some people see at sign-in. So every card has an opt-in **Ask the web** button. Only the file name, a descriptive entry name and the publisher leave the laptop: never paths, usernames, SIDs or other entries. The dashboard shows you the exact query before anything is sent. Gemma then answers again with the search results in front of it and must cite them by number. Citations to results that don't exist are rejected, and an answer that cites nothing counts as low confidence, so the rules say "look it up". The rules re-decide using the web answer's category, and the card shows both verdicts.
