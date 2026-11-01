@@ -300,9 +300,11 @@ function lookupBlock(e) {
   if (!l) return null;
   if (l.error) return h("div", { class: "lookup" }, `Web lookup failed: ${l.error}`);
   const g = l.explanation || {};
+  const after = l.verdict && VERDICTS[l.verdict] ? `${VERDICTS[l.verdict].ghost} · ${VERDICTS[l.verdict].action}` : null;
   return h("div", { class: "lookup" },
-    h("div", {}, h("b", {}, "From the web: "), g.what_it_does || "No clear answer."),
+    h("div", {}, h("b", {}, "From the web: "), g.what_it_does && g.what_it_does !== "unknown" ? g.what_it_does : "No clear answer."),
     h("div", { class: "muted small" }, g.grounded ? `Grounded in results ${g.citations.join(", ")}` : "Not grounded: the model could not cite the results"),
+    after ? h("div", { class: "small" }, h("b", {}, "With the web's answer, the rules say: "), after) : null,
     h("ol", {}, ...(l.results || []).map((x) => h("li", {}, h("a", { href: x.link, target: "_blank", rel: "noopener noreferrer" }, x.title)))),
     h("div", {}, "Only this left your laptop: ", h("span", { class: "sent" }, l.query_sent)));
 }
@@ -315,6 +317,8 @@ function actions(e) {
   }
   if (["unknown", "unexplained"].includes(e.verdict) && r.web_lookup && !e.lookup) {
     out.append(h("button", { class: "btn small quiet", onclick: (ev) => lookupOne(e, ev.currentTarget) }, "Ask the web"));
+  } else if (r.web_lookup && !e.lookup && !e.is_windows && e.explanation) {
+    out.append(h("button", { class: "btn small link", onclick: (ev) => lookupOne(e, ev.currentTarget) }, "Double-check on the web"));
   }
   const c = e.commands || {};
   const key = `cmd-${e.id}`;
@@ -359,8 +363,7 @@ async function explainOne(id, button) {
 }
 
 async function lookupOne(e, button) {
-  const sent = `${e.file_name} ${e.publisher || ""}`.trim();
-  if (!confirm(`Search the web for this item?\n\nOnly this text leaves your laptop (through SerpApi):\n"${sent}"\n\nNo paths, usernames or other entries are sent.`)) return;
+  if (!confirm(`Search the web for this item?\n\nExactly this text leaves your laptop (through SerpApi):\n${e.lookup_query}\n\nNo paths, usernames or other entries are sent.`)) return;
   busy(button, "Searching…");
   try {
     replaceEntry(await api("/api/lookup", { id: e.id }));

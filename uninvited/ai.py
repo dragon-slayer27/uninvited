@@ -101,9 +101,27 @@ GROUNDED_SCHEMA = {
     "required": ["product", "vendor", "category", "what_it_does", "citations", "confidence"],
 }
 
-GROUNDED_SYSTEM = """You identify a Windows startup item using ONLY the numbered web search results provided.
-Cite the result numbers you used in "citations". If the results do not identify it, set product to "unknown",
-category to "unknown", confidence to "low" and citations to []. Do not tell the person what to do with it."""
+_CATEGORY_GUIDE = """Category guide:
+- updater: only installs updates for an app
+- security: antivirus or firewall
+- driver-helper: needed for sound, touchpad, keyboard keys, graphics, battery or other hardware to work
+- vendor-utility: laptop-maker extras such as diagnostics, analytics, screen sharing, recovery or app stores
+- cloud-sync: OneDrive, Dropbox, Google Drive and similar
+- chat-social: chat, call or meeting apps
+- browser: a web browser, its pre-loader or its background helpers
+- dev-tool: developer tools, databases, containers, local servers, AI runtimes, Linux subsystems
+- vpn-network: VPNs and network tools
+- exam-proctoring: exam lock-down software
+- game-launcher, media, productivity (office apps and their helpers)
+- windows-component: part of Windows itself
+- unknown: you do not recognise it"""
+
+GROUNDED_SYSTEM = """You identify a Windows startup item using the FACTS and ONLY the numbered web search results provided.
+Prefer what the results say over your own memory. Cite the result numbers you used in "citations".
+If the results do not identify it, set product to "unknown", category to "unknown", confidence to "low" and citations to [].
+Do not tell the person what to do with it.
+
+""" + _CATEGORY_GUIDE
 
 SEANCE_SCHEMA = {
     "type": "object",

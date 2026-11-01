@@ -148,10 +148,27 @@ def video(browser) -> None:
     print(f"video: {final}")
 
 
+def lookup_shot(browser) -> None:
+    """The Office card after a web double-check (search results are cached, so no new search is spent)."""
+    ctx = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = ctx.new_page()
+    page.on("dialog", lambda d: d.accept())
+    ready(page, REAL)
+    page.fill("#search", "click-to-run service")
+    page.wait_for_timeout(400)
+    card = page.locator(".entry").first
+    card.locator("text=Double-check on the web").click()
+    page.wait_for_selector(".entry .lookup", timeout=300000)
+    page.wait_for_timeout(400)
+    page.locator(".entry").first.screenshot(path=str(IMG / "card-lookup.png"))
+    ctx.close()
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--shots", action="store_true")
     p.add_argument("--video", action="store_true")
+    p.add_argument("--lookup", action="store_true")
     args = p.parse_args()
     with sync_playwright() as pw:
         browser = pw.chromium.launch(channel="msedge", headless=True)
@@ -159,6 +176,8 @@ def main() -> int:
             shots(browser)
         if args.video:
             video(browser)
+        if args.lookup:
+            lookup_shot(browser)
         browser.close()
     return 0
 

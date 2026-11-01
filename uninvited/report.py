@@ -9,7 +9,7 @@ import time
 from collections import Counter
 from typing import Callable
 
-from . import ai, rules, wakes
+from . import ai, lookup, rules, wakes
 from .config import home
 
 REPORT_FILE = "report.json"
@@ -47,6 +47,7 @@ def _display(entry: dict) -> dict:
         "verdict_reason": entry.get("verdict_reason"),
         "explanation": entry.get("explanation"),
         "lookup": entry.get("lookup"),
+        "lookup_query": lookup.build_query(entry),
         "planted": bool(entry.get("planted")),
         "commands": rules.commands(entry),
     }

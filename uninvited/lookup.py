@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import ntpath
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -17,13 +18,21 @@ from . import ai, config
 ENDPOINT = "https://serpapi.com/search.json"
 
 
+_NOISY_NAME = re.compile(r"S-1-5-|<you>|<this-pc>|\{?[0-9a-f]{8}-[0-9a-f]{4}-|[0-9a-f]{16,}", re.IGNORECASE)
+
+
 def build_query(entry: dict) -> str:
+    """Only the file name, a descriptive entry name and the publisher leave the machine."""
     name = ntpath.basename(entry.get("target") or "") or ai.anonymize(entry.get("name") or "")
-    pub = entry.get("publisher") or (entry.get("file") or {}).get("company") or ""
     query = f'"{name}"'
+    label = ai.anonymize(entry.get("display_name") or entry.get("name") or "")
+    label = re.sub(r"\s*\(action \d+ of \d+\)$", "", label)
+    if label and not _NOISY_NAME.search(label) and label.lower() not in name.lower():
+        query += f" {label}"
+    pub = entry.get("publisher") or (entry.get("file") or {}).get("company") or ""
     if pub:
         query += f" {pub}"
-    return query + " startup"
+    return query
 
 
 def search(query: str, key: str, num: int = 6) -> list[dict]:
@@ -71,5 +80,10 @@ def web_lookup(entry: dict, client: ai.Ollama | None = None, key: str | None = N
         explanation = ai.grounded_explain(entry, results, client)
     except ai.ModelError as exc:
         return {"query_sent": query, "results": results, "error": str(exc)}
+    from . import rules
+
+    verdict, reason = rules.decide(entry, {"category": explanation.get("category"),
+                                           "confidence": explanation.get("confidence") if explanation.get("grounded") else "low"})
     return {"query_sent": query, "results": results, "explanation": explanation,
+            "verdict": verdict, "verdict_reason": reason,
             "engine": "Google results via SerpApi", "cached": bool(hit)}

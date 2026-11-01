@@ -1,4 +1,4 @@
-# 👻 Uninvited
+﻿# 👻 Uninvited
 
 **What's haunting your laptop?** Uninvited finds out what pulls your Windows laptop out of sleep at night, and everything that starts without asking. A **Gemma 4 model running on your own laptop** explains each one in plain English. Plain, testable rules decide what to do about it.
 
@@ -113,7 +113,9 @@ python -m uninvited watch --explain-all   # a durable "explain everything" batch
 
 ## Web lookup (SerpApi), opt-in
 
-When Gemma doesn't recognise something, the card offers **Ask the web**. Only the file name and the publisher are sent (for example `"GlideXService.exe" ASUSTeK COMPUTER INC. startup`). No paths, usernames or other entries are sent, and the dashboard shows you the exact query. Gemma then explains the item using only the search results, and must cite them; citations that don't exist are rejected. Add `SERPAPI_KEY=...` to `.env` (the free plan has 250 searches a month).
+When Gemma doesn't recognise something, the card offers **Ask the web** (and **Double-check on the web** for anything else). Only the file name, a descriptive entry name and the publisher are sent, for example `"platform_experience_helper.exe" RunPlatformExperienceHelperOnUnlock Google LLC`. Names containing SIDs, GUIDs or your username are left out, and so are paths and other entries. The dashboard shows the exact query before anything is sent. Gemma then answers again with the search results and must cite them; citations to results that don't exist are rejected, and an answer that cites nothing is treated as low confidence. The rules re-decide using the web answer's category, and the card shows both verdicts. Add `SERPAPI_KEY=...` to `.env` (the free plan has 250 searches a month).
+
+On my laptop, the lookup turned Gemma's confidently wrong "Chrome helper = updater" into an honest "look it up". For Office's Click-to-Run service it found the missing fact ("required to run during the use of any Microsoft 365 and Office program"), though the verdict didn't change, because the rules only read the category.
 
 ## Privacy
 
@@ -138,7 +140,7 @@ Your startup list says a lot about you: your VPN, your exam software, your games
 - **Temporal** (MIT) for Night Watch, using the local dev server.
 - **SerpApi** for the opt-in lookup.
 - Python standard library only for the scanner, the rules and the dashboard (no build step, no CDN).
-- Built during Hacktoberfest 2026 ("Ghost in the Machine") with **GitHub Copilot** as a pair programmer, and a second Copilot agent as reviewer. 56 tests and a real scan of a clean Windows machine run on GitHub Actions (`windows-latest`); the build fails on any false alarm.
+- Built during Hacktoberfest 2026 ("Ghost in the Machine") with **GitHub Copilot** as a pair programmer, and a second Copilot agent as reviewer. 60 tests and a real scan of a clean Windows machine run on GitHub Actions (`windows-latest`); the build fails on any false alarm.
 
 ## License
 

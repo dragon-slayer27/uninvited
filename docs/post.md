@@ -1,4 +1,4 @@
----
+﻿---
 title: "Uninvited: my laptop left standby 233 times in 9 days. 72 times, it wasn't me."
 published: false
 tags: devchallenge, hf26challenge, ai, opensource
@@ -37,7 +37,7 @@ Uninvited never changes your system. For each guest it shows the exact command t
 
 ## Demo
 
-⟦VIDEO EMBED: {% embed https://www.youtube.com/watch?v=... %}⟧
+{% youtube AEO51j7ecp8 %}
 
 The video is a silent, captioned walk through the real dashboard on my laptop. The "poltergeist" and the zombies in it are the evaluation's planted samples, shown with a yellow "planted for the demo" badge, because my own laptop turned out to have none.
 
@@ -144,16 +144,22 @@ I tested the part that matters. I started a worker that could not reach the mode
 
 ### 5. Web lookup with SerpApi, opt-in
 
-Sometimes Gemma just doesn't know, or worse, doesn't know that it doesn't know. It confidently called Chrome's undocumented "Platform Experience Helper" an updater. It isn't one, and since July it has been blamed for a blank white window that some people see at sign-in. For unknowns, the card offers **Ask the web**. Only the file name and the publisher leave the laptop, never paths, usernames or other entries, and the dashboard shows the exact query. Gemma then explains the item using only the search results and must cite them by number; citations to results that don't exist are rejected.
+Sometimes Gemma just doesn't know, or worse, doesn't know that it doesn't know. It confidently called Chrome's undocumented "Platform Experience Helper" an updater. It isn't one, and since July it has been blamed for a blank white window that some people see at sign-in. So every card has an opt-in **Ask the web** button. Only the file name, a descriptive entry name and the publisher leave the laptop: never paths, usernames, SIDs or other entries. The dashboard shows you the exact query before anything is sent. Gemma then answers again with the search results in front of it and must cite them by number. Citations to results that don't exist are rejected, and an answer that cites nothing counts as low confidence, so the rules say "look it up". The rules re-decide using the web answer's category, and the card shows both verdicts.
 
-⟦SERPAPI RESULT⟧
+I spent 6 of SerpApi's 250 free monthly searches on the entries Uninvited got wrong. The result was honest, not magic:
+
+- **Chrome's helper.** Sent: `"platform_experience_helper.exe" RunPlatformExperienceHelperOnUnlock Google LLC`. The results were all about Chrome opening at startup, so Gemma could not cite anything. The verdict went from a confidently wrong "keep" to "look it up". An honest "I don't know" beats a confident wrong answer.
+- **Office Click-to-Run.** Grounded in two results, Gemma now says *"This service is required to run during the use of any Microsoft 365 and Office program"*. That is exactly the fact it was missing. But my rules only read the category ("productivity"), so the verdict stayed "your call". The cited fact now sits right on the card, and teaching the rules to read a "required by" field is the obvious next step.
+- **OneDrive's updater.** Grounded, still called "cloud sync". Still a miss.
+
+![Web lookup on the Office card](https://raw.githubusercontent.com/dragon-slayer27/uninvited/main/docs/img/card-lookup.png)
 
 ### 6. The boring parts that make it trustworthy
 
 - Python standard library only for the scanner, rules, model client and dashboard. No build step, no CDN, nothing loaded from the internet.
 - The dashboard binds to `127.0.0.1`, checks the `Host` and `Origin` headers, accepts only real JSON requests, sends a strict Content-Security-Policy, and renders every entry name with `textContent`. A startup entry is untrusted input, so a malicious one named `<img onerror=...>` cannot attack the tool that is inspecting it.
 - PCs without Modern Standby (most desktops) get the same view from their sleep and hibernate wake events, including which scheduled task asked to wake them. Reasons are read from codes, never from the translated message text.
-- 56 unit tests run on GitHub Actions on `windows-latest`, followed by a real scan of the runner's own clean Windows. The build fails if that clean machine shows a single "investigate".
+- 60 unit tests run on GitHub Actions on `windows-latest`, followed by a real scan of the runner's own clean Windows. The build fails if that clean machine shows a single "investigate".
 
 ### What went wrong (and what I learned)
 
@@ -191,7 +197,7 @@ Día de los Muertos honours what is gone, and Halloween is about what refuses to
 
 - **Best Use of Gemma:** Gemma 4 E4B (QAT) is the explanation engine for every startup item, the night report and the séance. E2B is evaluated as the low-memory option.
 - **Temporal:** Night Watch is a Temporal workflow with durable timers and retried model activities, plus a durable "explain everything" batch. Tested by taking the model away mid-run.
-- **SerpApi:** opt-in, citation-checked web lookup for items the local model doesn't recognise.
+- **SerpApi:** an opt-in, citation-checked web lookup for items the local model gets wrong or doesn't know. Only the file name, a descriptive entry name and the publisher are sent. Tested live on the entries Uninvited got wrong; results above.
 - **GitHub Copilot:** built with Copilot in VS Code, and reviewed by a second Copilot agent that found a command-injection hole before launch. GitHub Actions runs the tests plus a real scan of a clean Windows runner, and that scan caught a false-alarm bug my laptop couldn't show me.
 
 *AI disclosure: this project and post were made with substantial help from GitHub Copilot. All numbers come from my own laptop's logs and from the evaluation in the repo.*
