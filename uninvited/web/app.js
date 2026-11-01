@@ -311,36 +311,55 @@ function lookupBlock(e) {
 
 function actions(e) {
   const r = state.report;
-  const out = h("div", { class: "actions" });
+  const row = h("div", { class: "actions" });
+  const wrap = h("div", { class: "actions-wrap" }, row);
   if (!e.explanation && !e.is_windows && r.ai.ready) {
-    out.append(h("button", { class: "btn small", onclick: (ev) => explainOne(e.id, ev.currentTarget) }, "Ask Gemma"));
+    row.append(h("button", { class: "btn small", onclick: (ev) => explainOne(e.id, ev.currentTarget) }, "Ask Gemma"));
   }
   if (["unknown", "unexplained"].includes(e.verdict) && r.web_lookup && !e.lookup) {
-    out.append(h("button", { class: "btn small quiet", onclick: (ev) => lookupOne(e, ev.currentTarget) }, "Ask the web"));
+    row.append(h("button", { class: "btn small quiet", onclick: (ev) => lookupOne(e, ev.currentTarget) }, "Ask the web"));
   } else if (r.web_lookup && !e.lookup && !e.is_windows && e.explanation) {
-    out.append(h("button", { class: "btn small link", onclick: (ev) => lookupOne(e, ev.currentTarget) }, "Double-check on the web"));
+    row.append(h("button", { class: "btn small link", onclick: (ev) => lookupOne(e, ev.currentTarget) }, "Double-check on the web"));
   }
+  // Panels live below the link row, full width, so long commands can never push past the card.
   const c = e.commands || {};
-  const key = `cmd-${e.id}`;
   if (c.off) {
-    const box = h("div", { class: `cmds ${state.open.has(key) ? "" : "hidden"}` },
-      h("div", { class: "muted small" }, c.how + (c.admin ? " Needs an administrator terminal." : "")),
-      cmdRow("Turn off", c.off), cmdRow("Undo", c.undo));
-    out.append(h("button", { class: "btn small link", onclick: () => { box.classList.toggle("hidden"); state.open.has(key) ? state.open.delete(key) : state.open.add(key); } }, "How to turn it off"));
-    out.append(box);
+    const box = h("div", { class: "cmds" },
+      h("p", { class: "cmd-how" }, c.how, c.admin ? h("span", { class: "admin" }, "run as administrator") : null),
+      cmdBlock("Turn off", c.off), cmdBlock("Undo", c.undo));
+    row.append(toggle("How to turn it off", box, `cmd-${e.id}`));
+    wrap.append(box);
   }
-  const det = h("div", { class: "details hidden" },
+  const det = h("div", { class: "details" },
     h("div", {}, h("b", {}, "Command: "), e.command || "?"),
     h("div", {}, h("b", {}, "Where: "), e.location || "?"),
     e.description ? h("div", {}, h("b", {}, "Windows says: "), e.description) : null,
     (ex => ex && ex.notes && ex.notes.length ? h("div", {}, h("b", {}, "Guard notes: "), ex.notes.join("; ")) : null)(e.explanation));
-  out.append(h("button", { class: "btn small link", onclick: () => det.classList.toggle("hidden") }, "Details"), det);
-  return out;
+  row.append(toggle("Details", det, `det-${e.id}`));
+  wrap.append(det);
+  return wrap;
 }
 
-function cmdRow(label, text) {
-  return h("div", { class: "cmd" }, h("span", { class: "lbl" }, label), h("code", {}, text),
-    h("button", { class: "btn small quiet", onclick: () => navigator.clipboard.writeText(text).then(() => toast("Copied")) }, "Copy"));
+function toggle(label, panel, key) {
+  const open = state.open.has(key);
+  panel.classList.toggle("hidden", !open);
+  const btn = h("button", { class: "btn small link", "aria-expanded": String(open) }, label);
+  btn.addEventListener("click", () => {
+    const nowOpen = !panel.classList.toggle("hidden");
+    btn.setAttribute("aria-expanded", String(nowOpen));
+    if (nowOpen) state.open.add(key); else state.open.delete(key);
+  });
+  return btn;
+}
+
+function cmdBlock(label, text) {
+  const copy = h("button", {
+    class: "btn small quiet",
+    onclick: () => navigator.clipboard.writeText(text).then(() => toast("Copied"), () => toast("Copy failed: select the text instead")),
+  }, "Copy");
+  return h("div", { class: "cmd" },
+    h("div", { class: "cmd-head" }, h("span", { class: "lbl" }, label), copy),
+    h("pre", { class: "cmd-code" }, text));
 }
 
 function replaceEntry(updated) {

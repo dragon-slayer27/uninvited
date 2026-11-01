@@ -142,6 +142,12 @@ Your startup list says a lot about you: your VPN, your exam software, your games
 - Python standard library only for the scanner, the rules and the dashboard (no build step, no CDN).
 - Built during Hacktoberfest 2026 ("Ghost in the Machine") with **GitHub Copilot** as a pair programmer, and a second Copilot agent as reviewer. 60 tests and a real scan of a clean Windows machine run on GitHub Actions (`windows-latest`); the build fails on any false alarm.
 
+## Changes after the submission deadline
+
+The challenge closed on Oct 31, 2026 at 11:59 PM PDT (Nov 1, 12:29 PM IST). The version submitted for judging is commit [`7bd85bd`](https://github.com/dragon-slayer27/uninvited/tree/7bd85bd), the last commit before the deadline. Changes made after that:
+
+- **2026-11-01: dashboard layout fix.** The "How to turn it off" commands overflowed their card. They now open in their own panel and wrap, and long unbroken text inside cards (such as Windows' raw resource strings) wraps on narrow screens. This only changes the dashboard's look: scanning, rules, the evaluation and the screenshots in the DEV post are unchanged.
+
 ## License
 
 MIT
